@@ -1,0 +1,169 @@
+---
+title: "RSY: Collaborative Filtering with Movie Lens Data"
+output: html_notebook
+---
+
+### Sources:
+https://ds-spaces.technik.fhnw.ch/app/uploads/sites/85/2021/09/hs21_rsy_trainingscenter_minichallenge1_aufgabenstellung-1.pdf
+https://www.rstudio.com/resources/cheatsheets/
+https://cran.r-project.org/web/packages/recommenderlab/recommenderlab.pdf
+
+
+```{r}
+# Imports
+library("tidyverse")
+library("recommenderlab")
+library("ggplot2")
+source("helper.R")
+data("MovieLense")
+
+```
+
+## Sampling Data and Save as DF
+```{r}
+movie_lens <- sample_movie_lens(size=600, return_df = TRUE)
+class(movie_lens)
+````
+
+# Explorative Datenanalyse
+
+
+## Task 1
+Aufgabe: Untersuche die Eigenschaften der MovieLense Daten und
+beantworte folgende Fragen:
+  1. Welches sind die am häufigsten geschauten Genres/Filme?
+  2. Wie verteilen sich die Kundenratings gesamthaft und nach Genres?
+  3. Wie verteilen sich die mittleren Kundenratings pro Film?
+  4. Wie stark streuen die Ratings von individuellen Kunden?
+  5. Welchen Einfluss hat die Normierung der Ratings pro Kunde auf deren
+  Verteilung?
+  6. Welche strukturellen Charakteristika (z.B. Sparsity) und Auffälligkeiten zeigt
+  die User-Item Matrix?
+  
+### WElches sind die am häufigsten geschauten Filme/Genres?
+```{r}
+### Meistgeschaute Filme
+movie_idx_counts <- (colSums(movie_lens))
+movie_counts <- cbind(colnames(movie_lens), movie_idx_counts)
+
+movie_counts <- as_tibble(movie_counts)
+movie_counts <- rename(movie_counts, "name"="V1", "views"="movie_idx_counts")
+movie_counts$views <- as.numeric(factor(movie_counts$views))
+movie_counts <- arrange(movie_counts, desc(views))
+
+
+print("Meistgeschaute Filme: ")
+print(movie_counts[1:10,])
+
+
+### Meistgeschaute Genres
+movie_counts_joined <- dplyr::left_join(x = movie_counts, y = MovieLenseMeta, by=c("name" = "title"))
+
+head(movie_counts_joined)
+# Select only movie genres
+tmp <- movie_counts_joined[, c(5:length(colnames(movie_counts_joined)))]
+column_selection <- colnames(tmp)
+
+tmp <- reshape2::melt(data = movie_counts_joined,
+            id.vars  = c("views"),
+            measure.vars = column_selection,
+           variable.name = "genre")
+
+tmp_views <- tmp[tmp$value == 1, ]
+
+tmp_views <- tmp_views %>%
+  group_by(genre) %>%
+  summarise(viewed_sum = sum(views)) %>%
+  arrange(viewed_sum)
+
+ggplot(data = tmp_views, mapping = aes(x = viewed_sum, y = genre)) + 
+  geom_col() + labs(title = "Views by Genre", x = "Views", y = "") + 
+  xlim(0, max(tmp_views$viewed_sum)) + scale_x_continuous(labels = function(x) format(x, scientific = FALSE)) + theme_bw()
+
+
+### Anzahl Filme von jedem GEnre im Datensatz
+tmp <- tmp[tmp$value == 1, ]
+
+tmp_count <- tmp %>%
+  group_by(genre) %>%
+  summarise(sum_genre = sum(value))
+  
+ggplot(data = tmp_count, mapping = aes(x = sum_genre, y = genre)) + 
+  geom_col() + labs(title = "Count by Genre", x = "Views", y = "") + 
+  scale_x_continuous(labels = function(x) format(x, scientific = FALSE)) + theme_bw()
+```
+**Beschreibung:**
+Der Plot zeigt das die meistgeschauten Genres Comedy und Drama sind. Die am wenigsten geschauten 
+sind Western, Film-Noir, Fantasy und Animation.
+
+Die Views wiederspiegelen im Grunde die Menge aller Filme im Datensatz. Man kann sehen, dass
+die Ausbreitung der Bars sehr ähnlich proportional zu den Views ist die in einem GEnre überhaupt drin sind.
+
+
+### 2. Wie verteilen sich die Kundenratings gesamthaft und nach Genres?
+```{r}
+data <- coerce(movie_lens, data.frame())
+
+data
+
+data <- dplyr::left_join(x = data, y = MovieLenseMeta, by=c("item" = "title"))
+data <- reshape2::melt(data = data,
+             id.vars  = c("item", "user", "year", "rating"),
+             measure.vars = column_selection,
+             variable.name = "genre")
+
+data <- data[data$value > 0,]
+data$value <- NULL
+
+data
+ggplot(data = data, aes(x = data$rating)) +
+  geom_histogram(fill='grey') + labs(title = "Verteilung der Ratings")
+
+ggplot(data = data, aes(x = rating, y = genre)) +
+  geom_boxplot()
+
+ggplot(data = data, aes(x = rating, y=genre)) +
+  geom_count() + labs(y="", title = "Ratings per Genre")
+
+
+
+```
+
+
+
+### 3. Wie verteilen sich die mittleren Kundenratings pro Film?
+```{r}
+
+mean_movie_rating <- data %>%
+  group_by(item) %>%
+  summarise (mean_movie_rating = mean(rating))
+
+ggplot(data = mean_movie_rating, aes(x = mean_movie_rating)) + 
+  geom_histogram() + labs(title = "Mean Movie Ratings over all Movies")
+
+```
+### 4. Wie stark streuen die Ratings von individuellen Kunden?
+
+```{r}
+
+user_samples <- c(sample(data$user, size = 10))
+
+tmp<- data[data$user == user_samples,]
+
+ggplot(data = tmp , aes(x = user, y = rating)) + 
+  geom_boxplot() + labs(title = "Ratings from Individual Users")
+```
+
+
+
+
+
+
+### 6. Welche strukturellen Charakteristika (z.B. Sparsity) und Auffälligkeiten zeigt die User-Item Matrix?
+```{r}
+image(movie_lens)
+```
+**Beschreibung:**
+Der Plot zeigt die Sparse-Matrix als Heatmap. Die SChwarzen Punkte sind die vorhanden Daten und die weissen zeigen die nicht vorhanden Werten in den Daten. Es wurden 600 Nutzer gesampelt, was hier über
+die Y-Achse zu sehen ist und der Datensatz hält etwas mehr als 1500 Filme auf der X-Achse.
+Der Plot zeigt, dass die Filme mit einer höheren ID eher sparse sind als diejenigen mit einer tiefen ID
