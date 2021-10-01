@@ -134,6 +134,11 @@ Die Verteilung der Ratings zeigt klar, dass das meistgebrauchte Rating die 4 ist
 Bei der Unterscheidung der Bewertung nach den Filmgenres können keine grosse Unterschiede festgestellt wird. Bei den 
 Horrorfilmen jedoch tendiert der Median und das 1 Quartil tiefer zu sein als bei den andern Genres. Die Medianwerte von Fantasy, Comedy und Children sind auch eher tief.
 
+Beim Punkteplot ist ein Vergleich schwierig weil die Countwerte grundsätzlich stark unterschiedlich und abhängig von 
+dem Genre sind. Dennoch kann man sehen wo die Nutzer absolut die meisten Ratings abgesetzt haben.
+Dies sind vor allem Action und Drama Filme. Bei allen Filmen tendiert die Mehrheit der Ratings eher grösser
+zu sein oder zu werden.
+
 
 ### 3. Wie verteilen sich die mittleren Kundenratings pro Film?
 ```{r}
@@ -146,6 +151,14 @@ ggplot(data = mean_movie_rating, aes(x = mean_movie_rating)) +
   geom_histogram() + labs(title = "Mean Movie Ratings over all Movies")
 
 ```
+**Beschreibung:**
+
+Die Mittleren Filmbewertung bewegen sich in der Mitte, respektive bei 3. Im mittleren Feld existiern
+die meisten Bewertung, zwischen 2 und 4. Es gibt ausserordnelich wenig FIlme, die im Schnitt eine Bewertung von 5
+haben. Handkerum gibt es viele Filme die eine Durchschnittliche Bewertung von 1 haben. Dies müsste jedoch noch mit der Anzahl der vorhanden Kundenbewertungen von den Filmen verglichen werden, da die sehr irreführend sein könnte.
+
+
+
 ### 4. Wie stark streuen die Ratings von individuellen Kunden?
 
 ```{r}
@@ -157,8 +170,20 @@ tmp<- data[data$user == user_samples,]
 ggplot(data = tmp , aes(x = user, y = rating)) + 
   geom_boxplot() + labs(title = "Ratings from Individual Users")
 ```
+**Beschreibung:**
+
+Auch hier zeigt sich das gleiche Bild wie bei dden mittleren Raatings bereits geshene. Die meisten
+Nutzerbewertungen sind um 3-4 herum.
 
 
+
+
+###  5. Welchen Einfluss hat die Normierung der Ratings pro Kunde auf deren  Verteilung?
+```{r}
+
+
+
+```
 
 
 
