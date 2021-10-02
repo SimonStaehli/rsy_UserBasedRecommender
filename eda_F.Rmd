@@ -1,0 +1,67 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library("recommenderlab")
+library("dplyr")
+library("tidyr")
+library("ggplot2")
+library("reshape2")
+```
+
+
+Explorative Datenanalyse:
+
+1.Welches sind die am häufigsten geschauten Genres/Filme?
+
+```{r}
+MostWatchedGenres <- pivot_longer(MovieLenseMeta, cols=4:22, names_to = "genre")
+MostWatchedGenres <- MostWatchedGenres %>% filter(value != 0)
+MostWatchedGenres$value <- NULL
+MostWatchedGenres <- MostWatchedGenres %>% count(genre, sort=TRUE)
+MostWatchedGenres
+
+df_MovieLense <- as(MovieLense, 'data.frame') 
+MostWatchedMovies <- df_MovieLense %>% count(item, sort=TRUE)
+MostWatchedMovies
+```
+
+2.Wie verteilen sich die Kundenratings gesamthaft und nach Genres?
+```{r}
+
+data_joined <- dplyr::left_join(x = df_MovieLense, y = MovieLenseMeta, by=c("item" = "title"))
+ggplot(data_joined, aes(x=rating)) + geom_bar()
+
+
+df_Genres <- pivot_longer(data_joined, cols=6:24, names_to = "genre")
+df_Genres <- df_Genres %>% filter(value != 0)
+df_Genres
+ggplot(data = df_Genres) + 
+  geom_bar(mapping = aes(x = rating)) + 
+  facet_wrap(~ genre)
+
+```
+
+3.Wie verteilen sich die mittleren Kundenratings pro Film?
+```{r}
+rating_mean <- aggregate(data_joined$rating, list(data_joined$item), mean)
+ggplot(rating_mean, aes(x=x)) + geom_density()+ labs(x = "mean rating", y = "density")
+```
+4.Wie stark streuen die Ratings von individuellen Kunden?
+```{r}
+
+```
+5.Welchen Einfluss hat die Normierung der Ratings pro Kunde auf deren Verteilung?
+```{r}
+
+```
+6.Welche strukturellen Charakteristika (z.B. Sparsity) und Auffälligkeiten zeigt die User-Item Matrix?
+```{r}
+
+```
