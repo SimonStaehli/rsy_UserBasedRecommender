@@ -51,17 +51,28 @@ ggplot(data = df_Genres) +
 3.Wie verteilen sich die mittleren Kundenratings pro Film?
 ```{r}
 rating_mean <- aggregate(data_joined$rating, list(data_joined$item), mean)
-ggplot(rating_mean, aes(x=x)) + geom_density()+ labs(x = "mean rating", y = "density")
+ggplot(rating_mean, aes(x=x)) + geom_density()+ labs(x = "mean rating per film", y = "density")
 ```
 4.Wie stark streuen die Ratings von individuellen Kunden?
 ```{r}
+user_mean <- aggregate(df_MovieLense$rating, list(df_MovieLense$user), mean)
+user_mean <- user_mean %>% 
+  rename(
+    user = Group.1,
+    rating = x
+    )
 
+ggplot(user_mean, aes(x=rating)) + geom_density()+ labs(x = "mean rating per User", y = "density")
+ggplot(user_mean, aes(user, rating))+ geom_jitter()
 ```
-5.Welchen Einfluss hat die Normierung der Ratings pro Kunde auf deren Verteilung?
+5.Welchen Einfluss hat die Normierung der Ratings pro Kunde auf deren Verteilung? (keine?)
 ```{r}
-
+user_mean_norm <- transform(user_mean,rating = (rating - min(rating)) / (max(rating) - min(rating)))
+ggplot(user_mean_norm, aes(x=rating)) + geom_density()+ labs(x = "mean rating per User", y = "density")
+ggplot(user_mean_norm, aes(user, rating))+ geom_jitter()
+                             
 ```
 6.Welche strukturellen Charakteristika (z.B. Sparsity) und Auffälligkeiten zeigt die User-Item Matrix?
 ```{r}
-
+image(MovieLense)
 ```
