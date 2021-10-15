@@ -15,13 +15,14 @@ library("tidyverse")
 library("recommenderlab")
 library("ggplot2")
 source("helper.R")
+library(gridExtra)
 data("MovieLense")
 
 ```
 
 ## Sampling Data and Save as DF
 ```{r}
-movie_lens <- sample_movie_lens(size=600, return_df = TRUE)
+movie_lens <- sample_movie_lens(size=length(MovieLense), return_df = TRUE)
 class(movie_lens)
 ````
 
@@ -128,16 +129,7 @@ ggplot(data = data, aes(x = rating, y=genre)) +
 
 
 ```
-**Beschreibung**:
-Die Verteilung der Ratings zeigt klar, dass das meistgebrauchte Rating die 4 ist.
 
-Bei der Unterscheidung der Bewertung nach den Filmgenres können keine grosse Unterschiede festgestellt wird. Bei den 
-Horrorfilmen jedoch tendiert der Median und das 1 Quartil tiefer zu sein als bei den andern Genres. Die Medianwerte von Fantasy, Comedy und Children sind auch eher tief.
-
-Beim Punkteplot ist ein Vergleich schwierig weil die Countwerte grundsätzlich stark unterschiedlich und abhängig von 
-dem Genre sind. Dennoch kann man sehen wo die Nutzer absolut die meisten Ratings abgesetzt haben.
-Dies sind vor allem Action und Drama Filme. Bei allen Filmen tendiert die Mehrheit der Ratings eher grösser
-zu sein oder zu werden.
 
 
 ### 3. Wie verteilen sich die mittleren Kundenratings pro Film?
@@ -151,48 +143,206 @@ ggplot(data = mean_movie_rating, aes(x = mean_movie_rating)) +
   geom_histogram() + labs(title = "Mean Movie Ratings over all Movies")
 
 ```
-**Beschreibung:**
-
-Die Mittleren Filmbewertung bewegen sich in der Mitte, respektive bei 3. Im mittleren Feld existiern
-die meisten Bewertung, zwischen 2 und 4. Es gibt ausserordnelich wenig FIlme, die im Schnitt eine Bewertung von 5
-haben. Handkerum gibt es viele Filme die eine Durchschnittliche Bewertung von 1 haben. Dies müsste jedoch noch mit der Anzahl der vorhanden Kundenbewertungen von den Filmen verglichen werden, da die sehr irreführend sein könnte.
-
-
-
 ### 4. Wie stark streuen die Ratings von individuellen Kunden?
 
 ```{r}
+data <- coerce(MovieLense, data.frame())
 
-user_samples <- c(sample(data$user, size = 10))
+
+unique_idx <- unique(data$user)
+user_samples <- sample(unique_idx, size = 10)
 
 tmp<- data[data$user == user_samples,]
+
+head(tmp)
 
 ggplot(data = tmp , aes(x = user, y = rating)) + 
   geom_boxplot() + labs(title = "Ratings from Individual Users")
 ```
-**Beschreibung:**
-
-Auch hier zeigt sich das gleiche Bild wie bei dden mittleren Raatings bereits geshene. Die meisten
-Nutzerbewertungen sind um 3-4 herum.
-
-
-
-
-###  5. Welchen Einfluss hat die Normierung der Ratings pro Kunde auf deren  Verteilung?
-```{r}
-
-
-
-```
-
 
 
 
 ### 6. Welche strukturellen Charakteristika (z.B. Sparsity) und Auffälligkeiten zeigt die User-Item Matrix?
 ```{r}
-image(movie_lens)
+image(MovieLense)
 ```
 **Beschreibung:**
+
 Der Plot zeigt die Sparse-Matrix als Heatmap. Die SChwarzen Punkte sind die vorhanden Daten und die weissen zeigen die nicht vorhanden Werten in den Daten. Es wurden 600 Nutzer gesampelt, was hier über
 die Y-Achse zu sehen ist und der Datensatz hält etwas mehr als 1500 Filme auf der X-Achse.
 Der Plot zeigt, dass die Filme mit einer höheren ID eher sparse sind als diejenigen mit einer tiefen ID
+
+
+````{r}
+# User Reduced
+df <- coerce(MovieLense, data.frame())
+
+user_counts <- df %>%
+  count(user)
+  
+user_counts <- head(user_counts[order(user_counts$n, decreasing = TRUE),], 400)
+
+user_with_info <- user_counts[, "user"]
+
+reduced_df <- df[df$user %in% user_with_info,]
+reduced_df
+
+# Movie Reduced
+length(unique(reduced_df$item))
+
+movie_counts <- reduced_df %>%
+  count(item)
+  
+movie_counts <- head(movie_counts[order(movie_counts$n, decreasing = TRUE),], 700)
+
+movie_with_info <- movie_counts[, "item"]
+
+reduced_df <- reduced_df[reduced_df$item %in% movie_with_info,]
+reduced_df
+
+
+````
+
+
+````{r}
+reduced_matrix <- coerce(reduced_df, MovieLense)
+
+image(reduced_matrix)
+
+
+````
+**Beschreibung:**
+
+User-Item Matrix mit reduzierten User und Items.
+
+
+
+````{r}
+library(gridExtra)
+
+rating_mean <- reduced_df %>%
+  group_by(item) %>%
+  summarise(mean = mean(rating)) %>%
+  select(item, mean) %>%
+  arrange(desc(mean))
+p1 <- ggplot(rating_mean, aes(x=mean)) + 
+  geom_density() +
+  ggtitle("Verteilung der mittleren Kundenratings nach Reduktion") + 
+  geom_vline(aes(xintercept=mean(mean)),
+            color="blue", linetype="dashed", size=1) +
+  xlim(1, 5)
+
+
+# Before
+rating_mean <- coerce(MovieLense, data.frame()) %>%
+  group_by(item) %>%
+  summarise(mean = mean(rating)) %>%
+  select(item, mean) %>%
+  arrange(desc(mean))
+p2 <-ggplot(rating_mean, aes(x=mean)) + 
+  geom_density() +
+  ggtitle("Verteilung der mittleren Kundenratings vor Reduktion") + 
+  geom_vline(aes(xintercept=mean(mean)),
+            color="blue", linetype="dashed", size=1)
+
+grid.arrange(p1, p2 , nrow=2)
+
+````
+
+**Beschreibung:**
+
+Der Durchschnitt der Durchschnitte hat sich vergrössert zu vorher und nacher.
+
+
+
+## Train-Test Split
+
+````{r}
+set.seed(69420)
+
+train_idx <- sample(x = c(TRUE, FALSE), size = nrow(reduced_matrix), replace = TRUE, 
+    prob = c(0.75, 0.25))
+
+MovieLense_train <- reduced_matrix[train_idx, ]
+MovieLense_test <- reduced_matrix[!train_idx, ]
+
+# Generate Model
+Recommender_model <- Recommender(data = MovieLense_train, method = "IBCF", 
+                                 parameter = list(k = 30, method = "Cosine"))
+
+similariy_mat <- as.matrix(Recommender_model@model$sim)
+similarity_lower <- similarity_mat[lower.tri(similarity_mat)]
+
+head(similarity_df)
+
+ggplot(mapping = aes(x=similarity_lower)) +
+  geom_density(fill="grey") + labs(title="Movie Similarities nearest 30") + 
+  xlab("Cosine Similarities")
+
+````
+
+````{r}
+
+similarity_df <- as.data.frame(as.matrix(Recommender_model@model$sim))
+
+similarity_df[similarity_df > 0 ] <- 1
+
+similarity_df <- colSums(similarity_df)
+similarity_df <- as.data.frame(similarity_df)
+
+similarity_df$movie <- row.names(similarity_df)
+
+similarity_df
+row.names(similarity_df) <- NULL
+
+similarity_df <- similarity_df[order(similarity_df$similarity_df, decreasing = TRUE),]
+
+top20 <- head(similarity_df, 20)
+
+names(top20)[1] <- "occurencies"
+
+top20 %>%
+  arrange(occurencies) %>%
+  ggplot(mapping = aes(x = occurencies, y = movie)) + 
+  geom_col() + labs(title="20 Most Appeared Movies in the Similarity Matrix")
+
+````
+
+
+
+
+
+
+````{r}
+eval_sets <- evaluationScheme(data = reduced_matrix,
+                              method = "cross-validation",
+                              k = 10,
+                              given = 4,
+                              goodRating = 0)
+
+models_to_evaluate <- list(
+  `IBCF Cosinus` = list(name = "IBCF", 
+                        param = list(method = "cosine"))
+)
+
+n_recommendations <- c(1, 5, seq(10, 100, 10))
+
+list_results <- evaluate(x = eval_sets, 
+                         method = models_to_evaluate, 
+                         n = n_recommendations)
+
+
+plot(list_results)
+````
+
+
+
+
+
+
+
+
+
+
+
+
