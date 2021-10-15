@@ -1,0 +1,79 @@
+```{r}
+library(recommenderlab)
+library(dplyr)
+library(ggplot2)
+library(ggridges)
+library(tidyr)
+library(coop)
+library(gridExtra)
+```
+Aufgabe: Reduziere den MovieLense Datensatz auf rund 400 Kunden 
+und 700 Filme, indem du Filme und Kunden  mit sehr wenigen Ratings 
+entfernst.
+Untersuche und dokumentiere die Eigenschaften des reduzierten 
+Datensatzes und beschreibe den Effekt der Datenreduktion:
+  1.Anzahl Filme und Kunden sowie Sparsity vor und nach Datenreduktion
+```{r}
+data(MovieLense)
+MovieLense_df <- as(MovieLense, "data.frame")
+MovieLenseMeta_df <- as(MovieLenseMeta, "data.frame")
+```
+```{r}
+MOVIE_MIN_RATED = 700
+MIN_MOVIES_RATED = 400
+####
+
+
+user_min_movies_rated <- MovieLense_df %>%
+  count(user) %>%
+  arrange(desc(n)) %>%
+  head(MIN_MOVIES_RATED) %>%
+  select(user)
+
+## Calculate 
+movies_min_rated <- MovieLense_df %>%
+  count(item) %>%
+  arrange(desc(n)) %>%
+  head(MOVIE_MIN_RATED) %>%
+  select(item)
+
+MovieLense_user_movies_reduced_df <- MovieLense_df %>%
+  inner_join(user_min_movies_rated, by='user') %>%
+  inner_join(movies_min_rated, by='item')
+
+MovieLense_user_movies_reduced
+
+### Sparsity
+image(MovieLense)
+image(coerce(MovieLense_user_movies_reduced_df, MovieLense))
+```
+```{r}
+rating_mean <- MovieLense_user_movies_reduced_df %>%
+  group_by(item) %>%
+  summarise(mean = mean(rating)) %>%
+  select(item, mean) %>%
+  arrange(desc(mean))
+
+p1 <- ggplot(rating_mean, aes(x=mean)) + 
+  geom_density() +
+  ggtitle("Verteilung der mittleren Kundenratings nach Reduktion") + 
+  geom_vline(aes(xintercept=mean(mean)),
+            color="blue", linetype="dashed", size=1) +
+  xlim(1, 5)
+
+
+
+rating_mean <- coerce(MovieLense, data.frame()) %>%
+  group_by(item) %>%
+  summarise(mean = mean(rating)) %>%
+  select(item, mean) %>%
+  arrange(desc(mean))
+
+p2 <-ggplot(rating_mean, aes(x=mean)) + 
+  geom_density() +
+  ggtitle("Verteilung der mittleren Kundenratings vor Reduktion") + 
+  geom_vline(aes(xintercept=mean(mean)),
+            color="blue", linetype="dashed", size=1)
+
+grid.arrange(p1, p2 , ncol=1, nrow=2)
+```
