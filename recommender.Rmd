@@ -91,14 +91,69 @@ train_idx <- sample(x = c(TRUE, FALSE), size = nrow(MovieLense_user_movies_reduc
 MovieLense_train <- MovieLense_user_movies_reduced[train_idx, ]
 MovieLense_test <- MovieLense_user_movies_reduced[!train_idx, ]
 ```
+2.Trainiere ein IBCF Modell mit 30 Nachbarn und Cosine Similarity
 ```{r}
-recc_data_train
+Recommender_model_IBCF <- Recommender(data = MovieLense_train, method = "IBCF", parameter = list(k = 30, 
+    method = "Cosine"))
+Recommender_model_IBCF
+```
+3. Bestimme die Verteilung der Filme, welche bei IBCF für paarweise 
+Ähnlichkeitsvergleiche verwendet werden,
+
+```{r}
+similariy_mat <- as.matrix(Recommender_model_IBCF@model$sim)
+similarity_lower <- similarity_mat[lower.tri(similarity_mat)]
+ggplot(mapping = aes(x=similarity_lower)) +
+  geom_density(fill="grey") + labs(title="Verteilung Aehnlichkeiten") + xlab("Cosine-Aehnlichkeit")
+```
+4.Bestimme die Filme, die am häufigsten in der Cosine-Ähnlichkeitsmatrix 
+auftauchen und analysiere deren Vorkommen und Ratings im reduzierten 
+Datensatz.
+```{r}
+
+
+
+```
+Aufgabe: Vergleiche und diskutiere Top-N Empfehlungen von IBCF und 
+UBCF Modellen mit 30 Nachbarn und Cosine Similarity für den 
+reduzierten Datensatz.
+1.Berechne Top-15 Empfehlungen für Testkunden mit IBCF und UBCF
+```{r}
+NUM_RECOMMENDATIONS = 15
+####
+
+Recommender_model_UBCF <- Recommender(data = MovieLense_train, method = "UBCF", parameter = list(method = "Cosine"))
+
+
+Pred_IBCF <- predict(object = Recommender_model_IBCF, newdata = MovieLense_test, n = NUM_RECOMMENDATIONS)
+Pred_UBCF <- predict(object = Recommender_model_UBCF, newdata = MovieLense_test, n = NUM_RECOMMENDATIONS)
+
+###
+
 ```
 ```{r}
+Pred_UBCF_df <- data.frame(user = sort(rep(1:length(Pred_UBCF@items), Pred_UBCF@n)), 
+    rating = unlist(Pred_UBCF@ratings), index = unlist(Pred_UBCF@items))
+
+Pred_IBCF_df <- data.frame(user = sort(rep(1:length(Pred_IBCF@items), Pred_IBCF@n)), 
+                           rating = unlist(Pred_IBCF@ratings), index = unlist(Pred_IBCF@items))
+
+
+Pred_IBCF_df$title <- Pred_IBCF@itemLabels[Pred_IBCF_df$index]
+Pred_IBCF_df$year <- MovieLenseMeta$year[Pred_IBCF_df$index]
+Pred_IBCF_df
+
+Pred_UBCF_df$title <- Pred_UBCF@itemLabels[Pred_UBCF_df$index]
+Pred_UBCF_df$year <- MovieLenseMeta$year[Pred_UBCF_df$index]
+Pred_UBCF_df
+
 ```
 ```{r}
+MovieLenseMeta_df
+
 ```
 ```{r}
-```
-```{r}
+
+
+
 ```
