@@ -41,8 +41,6 @@ MovieLense_user_movies_reduced_df <- MovieLense_df %>%
   inner_join(user_min_movies_rated, by='user') %>%
   inner_join(movies_min_rated, by='item')
 
-MovieLense_user_movies_reduced
-
 ### Sparsity
 image(MovieLense)
 image(coerce(MovieLense_user_movies_reduced_df, MovieLense))
@@ -76,4 +74,31 @@ p2 <-ggplot(rating_mean, aes(x=mean)) +
             color="blue", linetype="dashed", size=1)
 
 grid.arrange(p1, p2 , ncol=1, nrow=2)
+
+```
+Aufgabe: Erzeuge einen IBCF Recommender und analysiere die 
+Ähnlichkeitsmatrix des trainierten Modelles für den reduzierten 
+Datensatz.
+1.Zerlege den reduzierten MovieLense Datensatz in ein disjunktes Trainings-
+und Testdatenset im Verhältnis 4:1
+```{r}
+set.seed(69420)
+MovieLense_user_movies_reduced <- coerce(MovieLense_user_movies_reduced_df, MovieLense)
+
+train_idx <- sample(x = c(TRUE, FALSE), size = nrow(MovieLense_user_movies_reduced), replace = TRUE, 
+    prob = c(0.75, 0.25))
+
+MovieLense_train <- MovieLense_user_movies_reduced[train_idx, ]
+MovieLense_test <- MovieLense_user_movies_reduced[!train_idx, ]
+```
+```{r}
+recc_data_train
+```
+```{r}
+```
+```{r}
+```
+```{r}
+```
+```{r}
 ```
