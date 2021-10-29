@@ -101,7 +101,7 @@ Recommender_model_IBCF
 Ähnlichkeitsvergleiche verwendet werden,
 
 ```{r}
-similariy_mat <- as.matrix(Recommender_model_IBCF@model$sim)
+similarity_mat <- as.matrix(Recommender_model_IBCF@model$sim)
 similarity_lower <- similarity_mat[lower.tri(similarity_mat)]
 ggplot(mapping = aes(x=similarity_lower)) +
   geom_density(fill="grey") + labs(title="Verteilung Aehnlichkeiten") + xlab("Cosine-Aehnlichkeit")
