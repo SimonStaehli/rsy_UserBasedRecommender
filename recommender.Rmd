@@ -6,7 +6,6 @@ library(ggridges)
 library(tidyr)
 library(coop)
 library(gridExtra)
-library(naniar)
 ```
 Aufgabe: Reduziere den MovieLense Datensatz auf rund 400 Kunden 
 und 700 Filme, indem du Filme und Kunden  mit sehr wenigen Ratings 
@@ -15,9 +14,7 @@ Untersuche und dokumentiere die Eigenschaften des reduzierten
 Datensatzes und beschreibe den Effekt der Datenreduktion:
   1.Anzahl Filme und Kunden sowie Sparsity vor und nach Datenreduktion
   
-```{r}
-dim(MovieLense_user_movies_reduced_df)[1]
-```
+
 
 ```{r}
 data(MovieLense)
@@ -26,32 +23,40 @@ MovieLenseMeta_df <- as(MovieLenseMeta, "data.frame")
 ```
 ```{r}
 MOVIE_MIN_RATED = 700
-MIN_MOVIES_RATED = 400
+USER_MIN_RATED = 400
 ####
 
-user_min_movies_rated <- MovieLense_df %>%
-  count(user) %>%
-  arrange(desc(n)) %>%
-  head(MIN_MOVIES_RATED) %>%
-  select(user)
-
-## Calculate 
+# Calculate reduced Dataset.
+set.seed(4)
 movies_min_rated <- MovieLense_df %>%
   count(item) %>%
   arrange(desc(n)) %>%
   head(MOVIE_MIN_RATED) %>%
   select(item)
 
-random_movie_names <- sample(x = unique(MovieLense_df$item), size = MOVIE_MIN_RATED)
+MovieLense_user_movies_reduced_df <- MovieLense_df %>%
+  inner_join(movies_min_rated, by='item')
+
+user_min_movies_rated <- MovieLense_user_movies_reduced_df %>%
+  count(user) %>%
+  arrange(desc(n)) %>%
+  head(USER_MIN_RATED) %>%
+  select(user)
+
+MovieLense_user_movies_reduced_df <- MovieLense_user_movies_reduced_df %>%
+  inner_join(user_min_movies_rated, by='user') 
+
+# Calculate Random Dataset.
+random_users <- sample(x = unique(MovieLense_df$user), size = USER_MIN_RATED)
+
 Movies_random_selected_df <- MovieLense_df %>%
+  dplyr::filter(user %in% random_users)
+random_movie_names <- sample(x = unique(Movies_random_selected_df$item), size = MOVIE_MIN_RATED)
+
+Movies_random_selected_df <- Movies_random_selected_df %>%
   dplyr::filter(item %in% random_movie_names)
 
-#Movies_random_selected_df <- slice(MovieLense_df, sample(1:n())) %>%
-#  head(dim(MovieLense_user_movies_reduced_df)[1])
 
-MovieLense_user_movies_reduced_df <- MovieLense_df %>%
-  inner_join(user_min_movies_rated, by='user') %>%
-  inner_join(movies_min_rated, by='item')
 
 ### Sparsity
 image(MovieLense)
@@ -193,7 +198,7 @@ p2
 auftauchen und analysiere deren Vorkommen und Ratings im reduzierten 
 Datensatz.
 ```{r}
-
+train_test_reduced[[2]]
 
 
 ```
@@ -205,11 +210,12 @@ reduzierten Datensatz.
 NUM_RECOMMENDATIONS = 15
 ####
 
-Recommender_model_UBCF <- Recommender(data = MovieLense_train, method = "UBCF", parameter = list(method = "Cosine"))
+Recommender_model_IBCF <- Recommender(data = train_test_reduced[[1]], method = "IBCF", parameter = list(method = "Cosine"))
+Recommender_model_UBCF <- Recommender(data = train_test_reduced[[1]], method = "UBCF", parameter = list(method = "Cosine"))
 
 
-Pred_IBCF <- predict(object = Recommender_model_IBCF, newdata = MovieLense_test, n = NUM_RECOMMENDATIONS)
-Pred_UBCF <- predict(object = Recommender_model_UBCF, newdata = MovieLense_test, n = NUM_RECOMMENDATIONS)
+Pred_IBCF <- predict(object = Recommender_model_IBCF, newdata = train_test_reduced[[2]], n = NUM_RECOMMENDATIONS)
+Pred_UBCF <- predict(object = Recommender_model_UBCF, newdata = train_test_reduced[[2]], n = NUM_RECOMMENDATIONS)
 
 ###
 
