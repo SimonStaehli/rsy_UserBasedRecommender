@@ -6,14 +6,7 @@ library(ggridges)
 library(tidyr)
 library(coop)
 library(gridExtra)
-```
-```{r}
-movies_random_selected <- slice(MovieLense_df, sample(1:n()))
-movies_random_selected
-```
-```{r}
-movies_random_selected <- slice(MovieLense_df, sample(1:n()))
-movies_random_selected
+library(naniar)
 ```
 Aufgabe: Reduziere den MovieLense Datensatz auf rund 400 Kunden 
 und 700 Filme, indem du Filme und Kunden  mit sehr wenigen Ratings 
@@ -21,6 +14,11 @@ entfernst.
 Untersuche und dokumentiere die Eigenschaften des reduzierten 
 Datensatzes und beschreibe den Effekt der Datenreduktion:
   1.Anzahl Filme und Kunden sowie Sparsity vor und nach Datenreduktion
+  
+```{r}
+dim(MovieLense_user_movies_reduced_df)[1]
+```
+
 ```{r}
 data(MovieLense)
 MovieLense_df <- as(MovieLense, "data.frame")
@@ -29,7 +27,6 @@ MovieLenseMeta_df <- as(MovieLenseMeta, "data.frame")
 ```{r}
 MOVIE_MIN_RATED = 700
 MIN_MOVIES_RATED = 400
-RANDOM_SELECTED_ROWS = 67427 #
 ####
 
 user_min_movies_rated <- MovieLense_df %>%
@@ -46,7 +43,7 @@ movies_min_rated <- MovieLense_df %>%
   select(item)
 
 Movies_random_selected_df <- slice(MovieLense_df, sample(1:n())) %>%
-  head(RANDOM_SELECTED_ROWS)
+  head(dim(MovieLense_user_movies_reduced_df)[1])
 
 MovieLense_user_movies_reduced_df <- MovieLense_df %>%
   inner_join(user_min_movies_rated, by='user') %>%
@@ -55,7 +52,7 @@ MovieLense_user_movies_reduced_df <- MovieLense_df %>%
 ### Sparsity
 image(MovieLense)
 image(coerce(MovieLense_user_movies_reduced_df, MovieLense))
-image(coerce(movies_random_selected_df, MovieLense))
+image(coerce(Movies_random_selected_df, MovieLense))
 ```
 ```{r}
 calc_sparsity <- function(RRM){
@@ -127,43 +124,65 @@ Datensatz.
 und Testdatenset im Verhältnis 4:1
 ```{r}
 train_test_split <- function(RRM, ratio=0.8){
-  train_idx <- sample(x = c(TRUE, FALSE), size = nrow(RRM), replace = TRUE, 
-      prob = c(ratio, 1 - ratio))
+  train_idx <- sample(x = c(TRUE, FALSE), size = nrow(RRM), replace = TRUE, prob = c(ratio, 1 - ratio))
   
   RRM_train <- RRM[train_idx, ]
   RRM_test <- RRM[!train_idx, ]
   
-  return (c(RRM_train, RRM_train))
+  return (c(RRM_train, RRM_test))
 }
 
-set.seed(69420)
+set.seed(4)
 
 train_test_reduced <- train_test_split(coerce(MovieLense_user_movies_reduced_df, MovieLense))
+train_test_random <- train_test_split(coerce(Movies_random_selected_df, MovieLense))
 ```
 ```{r}
-train_test_reduced[1]
+Movies_random_selected_df
 ```
 
 2.Trainiere ein IBCF Modell mit 30 Nachbarn und Cosine Similarity
 ```{r}
-Recommender_model_IBCF <- Recommender(data = train_test_reduced[1], method = "IBCF", parameter = list(k = 30, 
+Recommender_model_IBCF_reduced <- Recommender(data = train_test_reduced[[1]], method = "IBCF", parameter = list(k = 30, 
     method = "Cosine"))
-Recommender_model_IBCF
+Recommender_model_IBCF_random <- Recommender(data = train_test_random[[1]], method = "IBCF", parameter = list(k = 30, 
+    method = "Cosine"))
+Recommender_model_IBCF_reduced
+Recommender_model_IBCF_random
 ```
 3. Bestimme die Verteilung der Filme, welche bei IBCF für paarweise 
 Ähnlichkeitsvergleiche verwendet werden,
-
 ```{r}
+similarity_mat <- as.matrix(Recommender_model_IBCF_random@model$sim)
+similarity_lower <- similarity_mat[lower.tri(similarity_mat)]
+similarity_lower = data.frame(similarity_lower)
+similarity_lower[similarity_lower > 0.999999] <- NA  
+similarity_lower[similarity_lower == 0] <- NA  
+similarity_lower <- similarity_lower %>% drop_na()
 similarity_lower
 ```
+  similarity_lower[similarity_lower > 0.999999] <- NA  
+  similarity_lower[similarity_lower == 0] <- NA  
 
 ```{r}
-similarity_mat <- as.matrix(Recommender_model_IBCF@model$sim)
-similarity_lower <- similarity_mat[lower.tri(similarity_mat)]
-similarity_lower <- replace(similarity_lower, 0.0, NA)
-similarity_lower[similarity_lower == 0] <- NA  
-ggplot(mapping = aes(x=similarity_lower)) +
-  geom_histogram(fill="grey", na.rm=TRUE) + labs(title="Verteilung Aehnlichkeiten") + xlab("Cosine-Aehnlichkeit")
+plot_similarity_matrix <- function(Rec_Model, title, ignore_zeros=TRUE){
+  similarity_mat <- as.matrix(Rec_Model@model$sim)
+  similarity_lower <- similarity_mat[lower.tri(similarity_mat)]
+  similarity_lower = data.frame(similarity_lower)
+  similarity_lower[similarity_lower < 0.000001] <- NA
+  similarity_lower[similarity_lower > 0.999999] <- NA
+  similarity_lower <- similarity_lower %>% drop_na()
+  similarity_lower <- coerce(similarity_lower, similarity_mat)
+  
+  p <- ggplot(mapping = aes(x=similarity_lower)) +
+    geom_histogram(fill="grey", na.rm=TRUE) + labs(title=title) + xlab("Cosine-Aehnlichkeit")
+  return (p)
+}
+p1 <- plot_similarity_matrix(Recommender_model_IBCF_reduced, 'Verteilung Aehnlichkeiten reduzierter Datensatz')
+p2 <- plot_similarity_matrix(Recommender_model_IBCF_random, 'Verteilung Aehnlichkeiten random Datensatz')
+p1
+p2
+
 ```
 4.Bestimme die Filme, die am häufigsten in der Cosine-Ähnlichkeitsmatrix 
 auftauchen und analysiere deren Vorkommen und Ratings im reduzierten 
