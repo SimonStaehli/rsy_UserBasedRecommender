@@ -42,8 +42,12 @@ movies_min_rated <- MovieLense_df %>%
   head(MOVIE_MIN_RATED) %>%
   select(item)
 
-Movies_random_selected_df <- slice(MovieLense_df, sample(1:n())) %>%
-  head(dim(MovieLense_user_movies_reduced_df)[1])
+random_movie_names <- sample(x = unique(MovieLense_df$item), size = MOVIE_MIN_RATED)
+Movies_random_selected_df <- MovieLense_df %>%
+  dplyr::filter(item %in% random_movie_names)
+
+#Movies_random_selected_df <- slice(MovieLense_df, sample(1:n())) %>%
+#  head(dim(MovieLense_user_movies_reduced_df)[1])
 
 MovieLense_user_movies_reduced_df <- MovieLense_df %>%
   inner_join(user_min_movies_rated, by='user') %>%
@@ -68,7 +72,8 @@ spars_name = c('Full Matrix', 'Reduced Matrix', 'Random Matrix')
 
 ggplot(mapping=aes(spars_name, all_spars)) + 
   geom_col() +
-  ggtitle(paste("Sparsity der verschiedenen Matrizen. "))
+  ggtitle(paste("Sparsity der verschiedenen Matrizen")) +
+  xlab("") + ylab("Sparse / Non-Sparse")
 ```
 ```{r}
 all_spars
@@ -153,11 +158,11 @@ Recommender_model_IBCF_random
 3. Bestimme die Verteilung der Filme, welche bei IBCF für paarweise 
 Ähnlichkeitsvergleiche verwendet werden,
 ```{r}
-similarity_mat <- as.matrix(Recommender_model_IBCF_random@model$sim)
+similarity_mat <- as.matrix(Recommender_model_IBCF_reduced@model$sim)
 similarity_lower <- similarity_mat[lower.tri(similarity_mat)]
 similarity_lower = data.frame(similarity_lower)
-similarity_lower[similarity_lower > 0.999999] <- NA  
-similarity_lower[similarity_lower == 0] <- NA  
+similarity_lower[similarity_lower < 0.0000001] <- NA
+similarity_lower[similarity_lower > 0.9999999] <- NA 
 similarity_lower <- similarity_lower %>% drop_na()
 similarity_lower
 ```
@@ -169,8 +174,8 @@ plot_similarity_matrix <- function(Rec_Model, title, ignore_zeros=TRUE){
   similarity_mat <- as.matrix(Rec_Model@model$sim)
   similarity_lower <- similarity_mat[lower.tri(similarity_mat)]
   similarity_lower = data.frame(similarity_lower)
-  similarity_lower[similarity_lower < 0.000001] <- NA
-  similarity_lower[similarity_lower > 0.999999] <- NA
+  similarity_lower[similarity_lower < 0.0000001] <- NA
+  similarity_lower[similarity_lower > 0.9999999] <- NA
   similarity_lower <- similarity_lower %>% drop_na()
   similarity_lower <- coerce(similarity_lower, similarity_mat)
   

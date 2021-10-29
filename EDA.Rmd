@@ -40,6 +40,24 @@ MostWatchedGenres <- inner_join(MostWatchedMovies, Movie_Genre) %>%
 MostWatchedGenres
 ```
 ```{r}
+# 1.a.Wieviele Filme bewerten User
+MoviesRatedPerUser <- MovieLenseSample %>% count(user, sort=TRUE)
+MoviesRatedPerUser
+
+ggplot(MoviesRatedPerUser, aes(x=n)) + 
+  geom_histogram(bins=30) +   
+  ggtitle("Verteilungen Anzahl Bewertungen pro User. ") 
+```
+```{r}
+# 1.b. ANzahl Bewertungen pro Film
+MoviesRatedPerUser <- MovieLenseSample %>% count(title, sort=TRUE)
+MoviesRatedPerUser
+
+ggplot(MoviesRatedPerUser, aes(x=n)) + 
+  geom_histogram(bins=30) +   
+  ggtitle("Verteilungen Anzahl Bewertungen pro Film. ") 
+```
+```{r}
 # 2.Wie verteilen sich die Kundenratings gesamthaft und nach Genres?
 ggplot(MovieLenseSample, aes(x=rating)) + 
   geom_bar() +
