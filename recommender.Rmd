@@ -56,13 +56,34 @@ random_movie_names <- sample(x = unique(Movies_random_selected_df$item), size = 
 Movies_random_selected_df <- Movies_random_selected_df %>%
   dplyr::filter(item %in% random_movie_names)
 
+# Normaized Ratings
+MovieLense_norm <- recommenderlab::normalize(MovieLense)
+MovieLense_reduced_norm <- recommenderlab::normalize(coerce(MovieLense_user_movies_reduced_df, MovieLense))
+MovieLense_random_norm <- recommenderlab::normalize(coerce(Movies_random_selected_df, MovieLense))
 
 
 ### Sparsity
-image(MovieLense)
-image(coerce(MovieLense_user_movies_reduced_df, MovieLense))
-image(coerce(Movies_random_selected_df, MovieLense))
+# Not Normalized
+plot_rows = 50
+image(MovieLense[1:plot_rows, 1:plot_rows], main = "Ratings Snippet: ALL")
+image(coerce(MovieLense_user_movies_reduced_df, MovieLense)[1:plot_rows, 1:plot_rows], main = "Ratings Snippet: Reduced")
+image(coerce(Movies_random_selected_df, MovieLense)[1:plot_rows, 1:plot_rows], main = "Ratings Snippet: Random")
+
+# Normalized Ratings
+image(MovieLense_norm[1:plot_rows, 1:plot_rows], main = "Normalized Ratings Snippet: ALL")
+image(MovieLense_reduced_norm[1:plot_rows, 1:plot_rows], main = "Normalized Ratings Snippet: Reduced")
+image(MovieLense_random_norm[1:plot_rows, 1:plot_rows], main = "Normalized Ratings Snippet: Random")
+
+
+
 ```
+**Beschreibung:**
+
+Lorem ipsum ...
+
+
+
+
 ```{r}
 calc_sparsity <- function(RRM){
   density_ = nratings(RRM) / (nrow(RRM)*ncol(RRM))
@@ -76,62 +97,66 @@ all_spars = c(full_spars, reduced_spars, rand_spars)
 spars_name = c('Full Matrix', 'Reduced Matrix', 'Random Matrix')
 
 ggplot(mapping=aes(spars_name, all_spars)) + 
-  geom_col() +
+  geom_col(fill = "grey", color="black") +
   ggtitle(paste("Sparsity der verschiedenen Matrizen")) +
-  xlab("") + ylab("Sparse / Non-Sparse")
+  xlab("") + ylab("Sparse Elements / All Elements ")
 ```
+**Beschreibung:**
+
+Lorem ipsum ...
+
+
+
 ```{r}
-all_spars
-```
-```{r}
-rating_mean <- MovieLense_user_movies_reduced_df %>%
-  group_by(item) %>%
-  summarise(mean = mean(rating)) %>%
-  select(item, mean) %>%
-  arrange(desc(mean))
 
-p1 <- ggplot(rating_mean, aes(x=mean)) + 
-  geom_density() +
-  ggtitle("Verteilung der mittleren Kundenratings nach Reduktion") + 
-  geom_vline(aes(xintercept=mean(mean)),
-            color="blue", linetype="dashed", size=1) +
-  xlim(1, 5)
-
-
-
-rating_mean <- coerce(MovieLense, data.frame()) %>%
-  group_by(item) %>%
-  summarise(mean = mean(rating)) %>%
-  select(item, mean) %>%
-  arrange(desc(mean))
-
-p2 <-ggplot(rating_mean, aes(x=mean)) + 
-  geom_density() +
-  ggtitle("Verteilung der mittleren Kundenratings vor Reduktion") + 
-  geom_vline(aes(xintercept=mean(mean)),
-            color="blue", linetype="dashed", size=1)
-
-rating_mean <- Movies_random_selected_df %>%
-  group_by(item) %>%
-  summarise(mean = mean(rating)) %>%
-  select(item, mean) %>%
-  arrange(desc(mean))
+plot_rating_mean <- function(data, plot_title){
+  # Extracts rating means by grouping values
+  rating_mean <- data %>%
+    group_by(item) %>%
+    summarise(mean = mean(rating)) %>%
+    select(item, mean) %>%
+    arrange(desc(mean))
+    
+    r_plot <- ggplot(rating_mean, aes(x=mean)) + 
+      geom_density(fill="grey") +
+      ggtitle(plot_title) + 
+      geom_vline(aes(xintercept=mean(mean)),
+                color="black", linetype="dashed", size=1) +
+      xlab("Mean Ratings")
+    
+    return(r_plot)
+}
 
 
-p3 <-ggplot(rating_mean, aes(x=mean)) + 
-  geom_density() +
-  ggtitle("Verteilung der mittleren Kundenratings bei Zufallsauswahl") + 
-  geom_vline(aes(xintercept=mean(mean)),
-            color="blue", linetype="dashed", size=1)
+# Plot data
+p1 <- plot_rating_mean(data = coerce(MovieLense, data.frame()), plot_title = "ALL")
+p2 <- plot_rating_mean(data = MovieLense_user_movies_reduced_df, plot_title = "Reduced")
+p3 <- plot_rating_mean(data = Movies_random_selected_df, plot_title = "Random")
 
-grid.arrange(p1, p2, p3, ncol=1, nrow=3)
+
+grid.arrange(p1, p2, p3, ncol=1, nrow=3, top = "Unnormalized Mean Ratings")
+
+
+# Plot normalized ratings
+p1 <- plot_rating_mean(data = as(MovieLense_norm, "data.frame"), plot_title = "ALL")
+p2 <- plot_rating_mean(data = as(MovieLense_reduced_norm, "data.frame"), plot_title = "Reduced")
+p3 <- plot_rating_mean(data = as(MovieLense_random_norm, "data.frame"), plot_title = "Random")
+
+grid.arrange(p1, p2, p3, ncol=1, nrow=3, top="Normalized Mean Ratings")
 
 ```
+**Beschreibung:**
+
+Lorem ipsum ...
+
+
+
 Aufgabe: Erzeuge einen IBCF Recommender und analysiere die 
 Ähnlichkeitsmatrix des trainierten Modelles für den reduzierten 
 Datensatz.
 1.Zerlege den reduzierten MovieLense Datensatz in ein disjunktes Trainings-
 und Testdatenset im Verhältnis 4:1
+
 ```{r}
 train_test_split <- function(RRM, ratio=0.8){
   train_idx <- sample(x = c(TRUE, FALSE), size = nrow(RRM), replace = TRUE, prob = c(ratio, 1 - ratio))
@@ -152,24 +177,39 @@ Movies_random_selected_df
 ```
 
 2.Trainiere ein IBCF Modell mit 30 Nachbarn und Cosine Similarity
+
 ```{r}
-Recommender_model_IBCF_reduced <- Recommender(data = train_test_reduced[[1]], method = "IBCF", parameter = list(k = 30, 
-    method = "Cosine"))
-Recommender_model_IBCF_random <- Recommender(data = train_test_random[[1]], method = "IBCF", parameter = list(k = 30, 
-    method = "Cosine"))
-Recommender_model_IBCF_reduced
-Recommender_model_IBCF_random
+
+eval_reduced <- recommenderlab::evaluationScheme(data = MovieLense_reduced_norm, 
+                                                 method="split", train=1-1/4, k=10, given=3)
+
+eval_random <- recommenderlab::evaluationScheme(data = MovieLense_random_norm, 
+                                                method="split", train=1-1/4, k=10, given=3)
+
+
+IBCF_reduced <- Recommender(data = getData(eval_reduced, "train"), method = "IBCF", 
+                            parameter = list(k = 30, method = "Cosine"))
+
+IBCF_random <- Recommender(data = getData(eval_random, "train"), method = "IBCF", 
+                            parameter = list(k = 30, method = "Cosine"))
+
+#getModel(IBCF_random)
+#getModel(IBCF_reduced)
+
 ```
+
+
 3. Bestimme die Verteilung der Filme, welche bei IBCF für paarweise 
 Ähnlichkeitsvergleiche verwendet werden,
+
+
 ```{r}
-similarity_mat <- as.matrix(Recommender_model_IBCF_reduced@model$sim)
+similarity_mat <- as.matrix(IBCF_reduced@model$sim)
 similarity_lower <- similarity_mat[lower.tri(similarity_mat)]
 similarity_lower = data.frame(similarity_lower)
 similarity_lower[similarity_lower < 0.0000001] <- NA
 similarity_lower[similarity_lower > 0.9999999] <- NA 
 similarity_lower <- similarity_lower %>% drop_na()
-similarity_lower
 ```
   similarity_lower[similarity_lower > 0.999999] <- NA  
   similarity_lower[similarity_lower == 0] <- NA  
@@ -188,12 +228,19 @@ plot_similarity_matrix <- function(Rec_Model, title, ignore_zeros=TRUE){
     geom_histogram(fill="grey", na.rm=TRUE) + labs(title=title) + xlab("Cosine-Aehnlichkeit")
   return (p)
 }
-p1 <- plot_similarity_matrix(Recommender_model_IBCF_reduced, 'Verteilung Aehnlichkeiten reduzierter Datensatz')
-p2 <- plot_similarity_matrix(Recommender_model_IBCF_random, 'Verteilung Aehnlichkeiten random Datensatz')
+p1 <- plot_similarity_matrix(IBCF_reduced, 'Verteilung Aehnlichkeiten reduzierter Datensatz')
+p2 <- plot_similarity_matrix(IBCF_random, 'Verteilung Aehnlichkeiten random Datensatz')
 p1
 p2
 
 ```
+**Beschreibung:**
+
+Lorem ipsum ...
+
+
+
+
 4.Bestimme die Filme, die am häufigsten in der Cosine-Ähnlichkeitsmatrix 
 auftauchen und analysiere deren Vorkommen und Ratings im reduzierten 
 Datensatz.
@@ -245,4 +292,4 @@ MovieLenseMeta_df
 
 
 
-```
+```MovieLense_reduced_normalized <- recommenderlab::normalize(coerce(MovieLense_user_movies_reduced_df, MovieLense ))
