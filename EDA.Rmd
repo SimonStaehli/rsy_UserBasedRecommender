@@ -14,15 +14,15 @@ MovieLense100
 ```
 
 ```{r}
-## Show rating of 50 users of 10 movies:
-ml10 <- MovieLense[c(1:50),c(1:10)]
+## Show rating of 5 users of 5 movies:
+ml10 <- MovieLense[c(1:5),c(1:5)]
 as(ml10, "matrix")
 ```
 ```{r}
-# Create subsample for Group Work:
-MovieLenseSample <- sample(x=MovieLense, size=500)
-MovieLenseSample <- as(MovieLenseSample, 'data.frame') 
-MovieLenseSample <- MovieLenseSample %>% rename(title = item )
+# Create subsample to make the EDA run faster.
+# MovieLenseSample <- sample(x=MovieLense, size=500)
+MovieLenseSample <- as(MovieLense, 'data.frame') 
+MovieLenseSample <- MovieLenseSample %>% rename(title = item)
 MovieLenseSample
 ```
 ```{r}
@@ -49,7 +49,7 @@ ggplot(MoviesRatedPerUser, aes(x=n)) +
   ggtitle("Verteilungen Anzahl Bewertungen pro User. ") 
 ```
 ```{r}
-# 1.b. ANzahl Bewertungen pro Film
+# 1.b. Anzahl Bewertungen pro Film
 MoviesRatedPerUser <- MovieLenseSample %>% count(title, sort=TRUE)
 MoviesRatedPerUser
 
@@ -87,11 +87,16 @@ rating_mean <- MovieLenseSample %>%
   arrange(desc(mean))
 rating_mean
 ggplot(rating_mean, aes(x=mean)) + 
-  geom_density() +   
-  ggtitle("Verteilung der mittleren Kundenratings") + 
+  geom_histogram() +   
+  ggtitle("Verteilung der durchschnittlichen Kundenratings") + 
   geom_vline(aes(xintercept=mean(mean)),
-            color="blue", linetype="dashed", size=1)
+            color="blue", linetype="dashed", size=1) +
+  xlab("Rating") + ylab("Anzahl")
 ```
+```{r}
+summary(rating_mean)
+```
+
 ```{r}
 # 4.Wie stark streuen die Ratings von individuellen Kunden?
 rating_std<- MovieLenseSample %>%
@@ -101,26 +106,41 @@ rating_std<- MovieLenseSample %>%
   arrange(desc(std))
 rating_std
 ggplot(rating_std, aes(x=std)) + 
-  geom_density() +
+  geom_histogram() +
   ggtitle("Streuung der Ratings von inviduellen Kunden") + 
   geom_vline(aes(xintercept=mean(std)),
+            color="blue", linetype="dashed", size=1)
+summary(rating_std)
+```
+
+```{r}
+summary(rating_std)
+```
+```{r}
+# 5.Welchen Einfluss hat die Normierung der Ratings pro Kunde auf deren Verteilung?
+MovieLense
+norm_rating_mean <- recommenderlab::normalize(MovieLense, method='center') 
+norm_rating_mean <- as(norm_rating_mean, 'data.frame') 
+ggplot(norm_rating_mean, aes(x=rating)) + 
+  geom_histogram() +
+  ggtitle("Streuung der normierten Ratings von inviduellen Kunden") + 
+  geom_vline(aes(xintercept=mean(rating)),
+            color="blue", linetype="dashed", size=1)
+
+norm_rating_mean <- recommenderlab::normalize(MovieLense, method='Z-score') 
+norm_rating_mean <- as(norm_rating_mean, 'data.frame') 
+ggplot(norm_rating_mean, aes(x=rating)) + 
+  geom_histogram() +
+  ggtitle("Streuung der normierten Ratings von inviduellen Kunden") + 
+  geom_vline(aes(xintercept=mean(rating)),
             color="blue", linetype="dashed", size=1)
 ```
 ```{r}
 # 5.Welchen Einfluss hat die Normierung der Ratings pro Kunde auf deren Verteilung?
-scale_this <- function(x){
-  (x - mean(x, na.rm=TRUE)) / sd(x, na.rm=TRUE)
-}
-norm_rating_mean <- MovieLenseSample %>%
-  group_by(user) %>%
-  mutate(rating_norm = scale_this(rating)) %>%
-  select(user, rating, rating_norm)
-
-ggplot(norm_rating_mean, aes(x=rating_norm)) + 
-  geom_density() +
-  ggtitle("Streuung der normierten Ratings von inviduellen Kunden") + 
-  geom_vline(aes(xintercept=mean(rating_norm)),
-            color="blue", linetype="dashed", size=1)
+MovieLense
+norm_rating_mean <- recommenderlab::normalize(MovieLense) 
+norm_rating_mean <- as(norm_rating_mean, 'data.frame') 
+norm_rating_mean
 ```
 ```{r}
 # 6.Welche strukturellen Charakteristika (z.B. Sparsity) und Auffälligkeiten zeigt die User-Item Matrix?
