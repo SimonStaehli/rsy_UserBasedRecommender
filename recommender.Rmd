@@ -13,9 +13,6 @@ entfernst.
 Untersuche und dokumentiere die Eigenschaften des reduzierten 
 Datensatzes und beschreibe den Effekt der Datenreduktion:
   1.Anzahl Filme und Kunden sowie Sparsity vor und nach Datenreduktion
-  
-
-
 ```{r}
 data(MovieLense)
 MovieLense_df <- as(MovieLense, "data.frame")
@@ -49,17 +46,28 @@ MovieLense_user_movies_reduced_df <- MovieLense_user_movies_reduced_df %>%
 # Calculate Random Dataset.
 random_users <- sample(x = unique(MovieLense_df$user), size = USER_MIN_RATED)
 
-Movies_random_selected_df <- MovieLense_df %>%
+Movies_user_random_selected_df <- MovieLense_df %>%
   dplyr::filter(user %in% random_users)
-random_movie_names <- sample(x = unique(Movies_random_selected_df$item), size = MOVIE_MIN_RATED)
 
-Movies_random_selected_df <- Movies_random_selected_df %>%
+random_movie_names <- sample(x = unique(Movies_user_random_selected_df$item), size = MOVIE_MIN_RATED)
+
+Movies_random_selected_df <- Movies_user_random_selected_df %>%
   dplyr::filter(item %in% random_movie_names)
+
+user_min_movies_rated <- Movies_user_random_selected_df %>%
+  count(item) %>%
+  arrange(desc(n)) %>%
+  head(MOVIE_MIN_RATED) %>%
+  select(item)
+
+MoviesLense_random_user_top_movies_df <- Movies_user_random_selected_df %>%
+  inner_join(user_min_movies_rated, by='item') 
 
 # Normaized Ratings
 MovieLense_norm <- recommenderlab::normalize(MovieLense)
 MovieLense_reduced_norm <- recommenderlab::normalize(coerce(MovieLense_user_movies_reduced_df, MovieLense))
 MovieLense_random_norm <- recommenderlab::normalize(coerce(Movies_random_selected_df, MovieLense))
+MovieLense_random_user_top_movie_norm <- recommenderlab::normalize(coerce(MoviesLense_random_user_top_movies_df, MovieLense))
 
 
 ### Sparsity
@@ -68,12 +76,12 @@ plot_rows = 50
 image(MovieLense[1:plot_rows, 1:plot_rows], main = "Ratings Snippet: ALL")
 image(coerce(MovieLense_user_movies_reduced_df, MovieLense)[1:plot_rows, 1:plot_rows], main = "Ratings Snippet: Reduced")
 image(coerce(Movies_random_selected_df, MovieLense)[1:plot_rows, 1:plot_rows], main = "Ratings Snippet: Random")
-
+image(coerce(MoviesLense_random_user_top_movies_df, MovieLense)[1:plot_rows, 1:plot_rows], main = "Ratings Snippet: Random User, Top Movies")
 # Normalized Ratings
 image(MovieLense_norm[1:plot_rows, 1:plot_rows], main = "Normalized Ratings Snippet: ALL")
 image(MovieLense_reduced_norm[1:plot_rows, 1:plot_rows], main = "Normalized Ratings Snippet: Reduced")
 image(MovieLense_random_norm[1:plot_rows, 1:plot_rows], main = "Normalized Ratings Snippet: Random")
-
+image(MovieLense_random_user_top_movie_norm[1:plot_rows, 1:plot_rows], main = "Normalized Ratings Snippet: Random User, Top Movies")
 
 
 ```
@@ -290,6 +298,6 @@ MovieLenseMeta_df
 ```
 ```{r}
 
+MovieLense_reduced_normalized <- recommenderlab::normalize(coerce(MovieLense_user_movies_reduced_df, MovieLense ))
 
-
-```MovieLense_reduced_normalized <- recommenderlab::normalize(coerce(MovieLense_user_movies_reduced_df, MovieLense ))
+```
