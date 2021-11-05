@@ -88,32 +88,39 @@ image(MovieLense_random_user_top_movie_norm[1:plot_rows, 1:plot_rows], main = "N
 **Beschreibung:**
 
 Lorem ipsum ...
-
-
-
-
 ```{r}
 calc_sparsity <- function(RRM){
   density_ = nratings(RRM) / (nrow(RRM)*ncol(RRM))
   return (1 - density_)
 }
+intersect_over_union <- function(mat1, mat2){
+  sparsity_iou <- calc_sparsity(mat1==mat2)
+  return (sparsity_iou)
+}
+```
+
+
+```{r}
 full_spars = calc_sparsity(coerce(MovieLense_df, MovieLense))
 reduced_spars = calc_sparsity(coerce(MovieLense_user_movies_reduced_df, MovieLense))
 rand_spars = calc_sparsity(coerce(Movies_random_selected_df, MovieLense))
+rand_top_movies_spars = calc_sparsity(coerce(MoviesLense_random_user_top_movies_df, MovieLense))
 
-all_spars = c(full_spars, reduced_spars, rand_spars)
-spars_name = c('Full Matrix', 'Reduced Matrix', 'Random Matrix')
+all_spars = c(full_spars, reduced_spars, rand_spars, rand_top_movies_spars)
+spars_name = c('Full Matrix', 'Reduced Matrix', 'Random Matrix', 'Random User, Top Movies Matrix')
 
-ggplot(mapping=aes(spars_name, all_spars)) + 
+ggplot(mapping=aes(spars_name, all_spars)) +
   geom_col(fill = "grey", color="black") +
   ggtitle(paste("Sparsity der verschiedenen Matrizen")) +
   xlab("") + ylab("Sparse Elements / All Elements ")
 ```
 **Beschreibung:**
 
+
 Lorem ipsum ...
-
-
+```{r}
+intersect_over_union(as.matrix(Movies_random_selected_df), as.matrix(MoviesLense_random_user_top_movies_df))
+```
 
 ```{r}
 
@@ -166,21 +173,6 @@ Datensatz.
 und Testdatenset im Verhältnis 4:1
 
 ```{r}
-train_test_split <- function(RRM, ratio=0.8){
-  train_idx <- sample(x = c(TRUE, FALSE), size = nrow(RRM), replace = TRUE, prob = c(ratio, 1 - ratio))
-  
-  RRM_train <- RRM[train_idx, ]
-  RRM_test <- RRM[!train_idx, ]
-  
-  return (c(RRM_train, RRM_test))
-}
-
-set.seed(4)
-
-train_test_reduced <- train_test_split(coerce(MovieLense_user_movies_reduced_df, MovieLense))
-train_test_random <- train_test_split(coerce(Movies_random_selected_df, MovieLense))
-```
-```{r}
 Movies_random_selected_df
 ```
 
@@ -188,18 +180,42 @@ Movies_random_selected_df
 
 ```{r}
 
-eval_reduced <- recommenderlab::evaluationScheme(data = MovieLense_reduced_norm, 
-                                                 method="split", train=1-1/4, k=10, given=3)
+eval_random <- recommenderlab::evaluationScheme(data = coerce(Movies_random_selected_df, MovieLense), 
+                                                 method="split", train=0.8, given=3)
 
-eval_random <- recommenderlab::evaluationScheme(data = MovieLense_random_norm, 
-                                                method="split", train=1-1/4, k=10, given=3)
+eval_random_norm <- recommenderlab::evaluationScheme(data = MovieLense_random_norm, 
+                                                method="split", train=0.8, given=3)
 
+eval_reduced <- recommenderlab::evaluationScheme(data = coerce(MovieLense_user_movies_reduced_df, MovieLense), 
+                                                 method="split", train=0.8, given=3)
 
-IBCF_reduced <- Recommender(data = getData(eval_reduced, "train"), method = "IBCF", 
-                            parameter = list(k = 30, method = "Cosine"))
+eval_reduced_norm <- recommenderlab::evaluationScheme(data = MovieLense_reduced_norm, 
+                                                method="split", train=0.8, given=3)
+
+eval_random_user_top_movies <- recommenderlab::evaluationScheme(data = coerce(MoviesLense_random_user_top_movies_df, MovieLense), 
+                                                method="split", train=0.8, given=3)
+
+eval_random_user_top_movies_norm <- recommenderlab::evaluationScheme(data = MovieLense_random_user_top_movie_norm, 
+                                                 method="split", train=0.8, given=3)
+
 
 IBCF_random <- Recommender(data = getData(eval_random, "train"), method = "IBCF", 
-                            parameter = list(k = 30, method = "Cosine"))
+                            parameter = list(k = 30, method = "Cosine", na_as_zero=FALSE))
+
+IBCF_random_norm <- Recommender(data = getData(eval_random_norm, "train"), method = "IBCF", 
+                            parameter = list(k = 30, method = "Cosine", na_as_zero=FALSE))
+
+IBCF_reduced <- Recommender(data = getData(eval_reduced, "train"), method = "IBCF", 
+                            parameter = list(k = 30, method = "Cosine", na_as_zero=FALSE))
+
+IBCF_reduced_norm <- Recommender(data = getData(eval_reduced_norm, "train"), method = "IBCF", 
+                            parameter = list(k = 30, method = "Cosine", na_as_zero=FALSE))
+
+IBCF_random_user_top_movies <- Recommender(data = getData(eval_random_user_top_movies, "train"), method = "IBCF", 
+                            parameter = list(k = 30, method = "Cosine", na_as_zero=FALSE))
+
+IBCF_random_user_top_movies_norm <- Recommender(data = getData(eval_random_user_top_movies_norm, "train"), method = "IBCF", 
+                            parameter = list(k = 30, method = "Cosine", na_as_zero=FALSE))
 
 #getModel(IBCF_random)
 #getModel(IBCF_reduced)
@@ -213,11 +229,9 @@ IBCF_random <- Recommender(data = getData(eval_random, "train"), method = "IBCF"
 
 ```{r}
 similarity_mat <- as.matrix(IBCF_reduced@model$sim)
-similarity_lower <- similarity_mat[lower.tri(similarity_mat)]
-similarity_lower = data.frame(similarity_lower)
-similarity_lower[similarity_lower < 0.0000001] <- NA
-similarity_lower[similarity_lower > 0.9999999] <- NA 
-similarity_lower <- similarity_lower %>% drop_na()
+similarity_mat = data.frame(similarity_mat)
+similarity_mat[similarity_mat < 0.0000001] <- NA
+similarity_mat
 ```
   similarity_lower[similarity_lower > 0.999999] <- NA  
   similarity_lower[similarity_lower == 0] <- NA  
@@ -225,23 +239,31 @@ similarity_lower <- similarity_lower %>% drop_na()
 ```{r}
 plot_similarity_matrix <- function(Rec_Model, title, ignore_zeros=TRUE){
   similarity_mat <- as.matrix(Rec_Model@model$sim)
-  similarity_lower <- similarity_mat[lower.tri(similarity_mat)]
-  similarity_lower = data.frame(similarity_lower)
-  similarity_lower[similarity_lower < 0.0000001] <- NA
-  similarity_lower[similarity_lower > 0.9999999] <- NA
-  similarity_lower <- similarity_lower %>% drop_na()
-  similarity_lower <- coerce(similarity_lower, similarity_mat)
+  similarity_mat <- data.frame(similarity_mat)
+  similarity_mat[similarity_mat == 0.0] <- NA
+  similarity_mat <- as.matrix(similarity_mat)
   
-  p <- ggplot(mapping = aes(x=similarity_lower)) +
+  p <- ggplot(mapping = aes(x=similarity_mat)) +
     geom_histogram(fill="grey", na.rm=TRUE) + labs(title=title) + xlab("Cosine-Aehnlichkeit")
   return (p)
 }
-p1 <- plot_similarity_matrix(IBCF_reduced, 'Verteilung Aehnlichkeiten reduzierter Datensatz')
-p2 <- plot_similarity_matrix(IBCF_random, 'Verteilung Aehnlichkeiten random Datensatz')
+
+
+p1 <- plot_similarity_matrix(IBCF_random, 'Verteilung Aehnlichkeiten random Datensatz')
+p2 <- plot_similarity_matrix(IBCF_random_norm, 'Verteilung Aehnlichkeiten random, normierter Datensatz')
+p3 <- plot_similarity_matrix(IBCF_reduced, 'Verteilung Aehnlichkeiten reduzierter Datensatz')
+p4 <- plot_similarity_matrix(IBCF_reduced_norm, 'Verteilung Aehnlichkeiten reduzierter, normierter Datensatz')
+p5 <- plot_similarity_matrix(IBCF_random_user_top_movies, 'Verteilung Aehnlichkeiten random user, top movies Datensatz')
+p6 <- plot_similarity_matrix(IBCF_random_user_top_movies_norm, 'Verteilung Aehnlichkeiten random user, top movies normiert Datensatz')
 p1
 p2
-
+p3
+p4
+p5
+p6
 ```
+
+
 **Beschreibung:**
 
 Lorem ipsum ...
@@ -254,8 +276,6 @@ auftauchen und analysiere deren Vorkommen und Ratings im reduzierten
 Datensatz.
 ```{r}
 train_test_reduced[[2]]
-
-
 ```
 Aufgabe: Vergleiche und diskutiere Top-N Empfehlungen von IBCF und 
 UBCF Modellen mit 30 Nachbarn und Cosine Similarity für den 
