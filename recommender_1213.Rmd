@@ -1,0 +1,510 @@
+```{r}
+library(recommenderlab)
+library(dplyr)
+library(ggplot2)
+library(ggridges)
+library(tidyr)
+library(coop)
+library(gridExtra)
+```
+
+Aufgabe: Reduziere den MovieLense Datensatz auf rund 400 Kunden 
+und 700 Filme, indem du Filme und Kunden  mit sehr wenigen Ratings 
+entfernst.
+Untersuche und dokumentiere die Eigenschaften des reduzierten 
+Datensatzes und beschreibe den Effekt der Datenreduktion:
+  1.Anzahl Filme und Kunden sowie Sparsity vor und nach Datenreduktion
+  
+```{r}
+data(MovieLense)
+MovieLense_df <- as(MovieLense, "data.frame")
+MovieLenseMeta_df <- as(MovieLenseMeta, "data.frame")
+```
+```{r}
+MOVIE_MIN_RATED = 700
+USER_MIN_RATED = 400
+####
+
+# Calculate reduced Dataset.
+set.seed(4)
+movies_min_rated <- MovieLense_df %>%
+  count(item) %>%
+  arrange(desc(n)) %>%
+  head(MOVIE_MIN_RATED) %>%
+  select(item)
+
+MovieLense_user_movies_reduced_df <- MovieLense_df %>%
+  inner_join(movies_min_rated, by='item')
+
+user_min_movies_rated <- MovieLense_user_movies_reduced_df %>%
+  count(user) %>%
+  arrange(desc(n)) %>%
+  head(USER_MIN_RATED) %>%
+  select(user)
+
+MovieLense_user_movies_reduced_df <- MovieLense_user_movies_reduced_df %>%
+  inner_join(user_min_movies_rated, by='user') 
+
+# Calculate Random Dataset.
+random_users <- sample(x = unique(MovieLense_df$user), size = USER_MIN_RATED)
+
+Movies_user_random_selected_df <- MovieLense_df %>%
+  dplyr::filter(user %in% random_users)
+
+random_movie_names <- sample(x = unique(Movies_user_random_selected_df$item), size = MOVIE_MIN_RATED)
+
+Movies_random_selected_df <- Movies_user_random_selected_df %>%
+  dplyr::filter(item %in% random_movie_names)
+
+user_min_movies_rated <- Movies_user_random_selected_df %>%
+  count(item) %>%
+  arrange(desc(n)) %>%
+  head(MOVIE_MIN_RATED) %>%
+  select(item)
+
+MoviesLense_random_user_top_movies_df <- Movies_user_random_selected_df %>%
+  inner_join(user_min_movies_rated, by='item') 
+
+# Normaized Ratings
+MovieLense_norm <- recommenderlab::normalize(MovieLense)
+MovieLense_reduced_norm <- recommenderlab::normalize(coerce(MovieLense_user_movies_reduced_df, MovieLense))
+MovieLense_random_norm <- recommenderlab::normalize(coerce(Movies_random_selected_df, MovieLense))
+MovieLense_random_user_top_movie_norm <- recommenderlab::normalize(coerce(MoviesLense_random_user_top_movies_df, MovieLense))
+
+
+### Sparsity
+# Not Normalized
+plot_rows = 50
+image(MovieLense[1:plot_rows, 1:plot_rows], main = "Ratings Snippet: ALL")
+image(coerce(MovieLense_user_movies_reduced_df, MovieLense)[1:plot_rows, 1:plot_rows], main = "Ratings Snippet: Reduced")
+image(coerce(Movies_random_selected_df, MovieLense)[1:plot_rows, 1:plot_rows], main = "Ratings Snippet: Random")
+image(coerce(MoviesLense_random_user_top_movies_df, MovieLense)[1:plot_rows, 1:plot_rows], main = "Ratings Snippet: Random User, Top Movies")
+# Normalized Ratings
+image(MovieLense_norm[1:plot_rows, 1:plot_rows], main = "Normalized Ratings Snippet: ALL")
+image(MovieLense_reduced_norm[1:plot_rows, 1:plot_rows], main = "Normalized Ratings Snippet: Reduced")
+image(MovieLense_random_norm[1:plot_rows, 1:plot_rows], main = "Normalized Ratings Snippet: Random")
+image(MovieLense_random_user_top_movie_norm[1:plot_rows, 1:plot_rows], main = "Normalized Ratings Snippet: Random User, Top Movies")
+
+
+```
+**Beschreibung:**
+
+Lorem ipsum ...
+
+
+
+
+```{r}
+calc_sparsity <- function(RRM){
+  density_ = nratings(RRM) / (nrow(RRM)*ncol(RRM))
+  return (1 - density_)
+}
+full_spars = calc_sparsity(coerce(MovieLense_df, MovieLense))
+reduced_spars = calc_sparsity(coerce(MovieLense_user_movies_reduced_df, MovieLense))
+rand_spars = calc_sparsity(coerce(Movies_random_selected_df, MovieLense))
+
+all_spars = c(full_spars, reduced_spars, rand_spars)
+spars_name = c('Full Matrix', 'Reduced Matrix', 'Random Matrix')
+
+ggplot(mapping=aes(spars_name, all_spars)) + 
+  geom_col(fill = "grey", color="black") +
+  ggtitle(paste("Sparsity der verschiedenen Matrizen")) +
+  xlab("") + ylab("Sparse Elements / All Elements ")
+```
+**Beschreibung:**
+
+Lorem ipsum ...
+
+
+
+```{r}
+
+plot_rating_mean <- function(data, plot_title){
+  # Extracts rating means by grouping values
+  rating_mean <- data %>%
+    group_by(item) %>%
+    summarise(mean = mean(rating)) %>%
+    select(item, mean) %>%
+    arrange(desc(mean))
+    
+    r_plot <- ggplot(rating_mean, aes(x=mean)) + 
+      geom_density(fill="grey") +
+      ggtitle(plot_title) + 
+      geom_vline(aes(xintercept=mean(mean)),
+                color="black", linetype="dashed", size=1) +
+      xlab("Mean Ratings")
+    
+    return(r_plot)
+}
+
+
+# Plot data
+p1 <- plot_rating_mean(data = coerce(MovieLense, data.frame()), plot_title = "ALL")
+p2 <- plot_rating_mean(data = MovieLense_user_movies_reduced_df, plot_title = "Reduced")
+p3 <- plot_rating_mean(data = Movies_random_selected_df, plot_title = "Random")
+
+
+grid.arrange(p1, p2, p3, ncol=1, nrow=3, top = "Unnormalized Mean Ratings")
+
+
+# Plot normalized ratings
+p1 <- plot_rating_mean(data = as(MovieLense_norm, "data.frame"), plot_title = "ALL")
+p2 <- plot_rating_mean(data = as(MovieLense_reduced_norm, "data.frame"), plot_title = "Reduced")
+p3 <- plot_rating_mean(data = as(MovieLense_random_norm, "data.frame"), plot_title = "Random")
+
+grid.arrange(p1, p2, p3, ncol=1, nrow=3, top="Normalized Mean Ratings")
+
+```
+**Beschreibung:**
+
+Lorem ipsum ...
+
+
+
+Aufgabe: Erzeuge einen IBCF Recommender und analysiere die 
+Ähnlichkeitsmatrix des trainierten Modelles für den reduzierten 
+Datensatz.
+1.Zerlege den reduzierten MovieLense Datensatz in ein disjunktes Trainings-
+und Testdatenset im Verhältnis 4:1
+
+```{r}
+train_test_split <- function(RRM, ratio=0.8){
+  train_idx <- sample(x = c(TRUE, FALSE), size = nrow(RRM), replace = TRUE, prob = c(ratio, 1 - ratio))
+  
+  RRM_train <- RRM[train_idx, ]
+  RRM_test <- RRM[!train_idx, ]
+  
+  return (c(RRM_train, RRM_test))
+}
+
+set.seed(4)
+
+train_test_reduced <- train_test_split(coerce(MovieLense_user_movies_reduced_df, MovieLense))
+train_test_random <- train_test_split(coerce(Movies_random_selected_df, MovieLense))
+```
+```{r}
+Movies_random_selected_df
+```
+
+2.Trainiere ein IBCF Modell mit 30 Nachbarn und Cosine Similarity
+
+```{r}
+
+eval_reduced <- recommenderlab::evaluationScheme(data = MovieLense_reduced_norm, 
+                                                 method="split", train=1-1/4, k=10, given=3)
+
+eval_random <- recommenderlab::evaluationScheme(data = MovieLense_random_norm, 
+                                                method="split", train=1-1/4, k=10, given=3)
+
+
+IBCF_reduced <- Recommender(data = getData(eval_reduced, "train"), method = "IBCF", 
+                            parameter = list(k = 30, method = "Cosine"))
+
+IBCF_random <- Recommender(data = getData(eval_random, "train"), method = "IBCF", 
+                            parameter = list(k = 30, method = "Cosine"))
+
+#getModel(IBCF_random)
+#getModel(IBCF_reduced)
+
+```
+
+
+3. Bestimme die Verteilung der Filme, welche bei IBCF für paarweise 
+Ähnlichkeitsvergleiche verwendet werden,
+
+
+```{r}
+similarity_mat <- as.matrix(IBCF_reduced@model$sim)
+similarity_lower <- similarity_mat[lower.tri(similarity_mat)]
+similarity_lower = data.frame(similarity_lower)
+similarity_lower[similarity_lower < 0.0000001] <- NA
+similarity_lower[similarity_lower > 0.9999999] <- NA 
+similarity_lower <- similarity_lower %>% drop_na()
+```
+  similarity_lower[similarity_lower > 0.999999] <- NA  
+  similarity_lower[similarity_lower == 0] <- NA  
+
+```{r}
+plot_similarity_matrix <- function(Rec_Model, title, ignore_zeros=TRUE){
+  similarity_mat <- as.matrix(Rec_Model@model$sim)
+  similarity_lower <- similarity_mat[lower.tri(similarity_mat)]
+  similarity_lower = data.frame(similarity_lower)
+  similarity_lower[similarity_lower < 0.0000001] <- NA
+  similarity_lower[similarity_lower > 0.9999999] <- NA
+  similarity_lower <- similarity_lower %>% drop_na()
+  similarity_lower <- coerce(similarity_lower, similarity_mat)
+  
+  p <- ggplot(mapping = aes(x=similarity_lower)) +
+    geom_histogram(fill="grey", na.rm=TRUE) + labs(title=title) + xlab("Cosine-Aehnlichkeit")
+  return (p)
+}
+p1 <- plot_similarity_matrix(IBCF_reduced, 'Verteilung Aehnlichkeiten reduzierter Datensatz')
+p2 <- plot_similarity_matrix(IBCF_random, 'Verteilung Aehnlichkeiten random Datensatz')
+p1
+p2
+
+```
+**Beschreibung:**
+
+Lorem ipsum ...
+
+
+
+
+4.Bestimme die Filme, die am häufigsten in der Cosine-Ähnlichkeitsmatrix 
+auftauchen und analysiere deren Vorkommen und Ratings im reduzierten 
+Datensatz.
+```{r}
+train_test_reduced[[2]]
+
+
+```
+Aufgabe: Vergleiche und diskutiere Top-N Empfehlungen von IBCF und 
+UBCF Modellen mit 30 Nachbarn und Cosine Similarity für den 
+reduzierten Datensatz.
+1.Berechne Top-15 Empfehlungen für Testkunden mit IBCF und UBCF
+```{r}
+NUM_RECOMMENDATIONS = 15
+####
+
+Recommender_model_IBCF <- Recommender(data = train_test_reduced[[1]], method = "IBCF", parameter = list(method = "Cosine"))
+Recommender_model_UBCF <- Recommender(data = train_test_reduced[[1]], method = "UBCF", parameter = list(method = "Cosine"))
+
+
+Pred_IBCF <- predict(object = Recommender_model_IBCF, newdata = train_test_reduced[[2]], n = NUM_RECOMMENDATIONS)
+Pred_UBCF <- predict(object = Recommender_model_UBCF, newdata = train_test_reduced[[2]], n = NUM_RECOMMENDATIONS)
+
+###
+
+```
+```{r}
+Pred_UBCF_df <- data.frame(user = sort(rep(1:length(Pred_UBCF@items), Pred_UBCF@n)), 
+    rating = unlist(Pred_UBCF@ratings), index = unlist(Pred_UBCF@items))
+
+Pred_IBCF_df <- data.frame(user = sort(rep(1:length(Pred_IBCF@items), Pred_IBCF@n)), 
+                           rating = unlist(Pred_IBCF@ratings), index = unlist(Pred_IBCF@items))
+
+
+Pred_IBCF_df$title <- Pred_IBCF@itemLabels[Pred_IBCF_df$index]
+Pred_IBCF_df$year <- MovieLenseMeta$year[Pred_IBCF_df$index]
+Pred_IBCF_df
+
+Pred_UBCF_df$title <- Pred_UBCF@itemLabels[Pred_UBCF_df$index]
+Pred_UBCF_df$year <- MovieLenseMeta$year[Pred_UBCF_df$index]
+Pred_UBCF_df
+
+```
+```{r}
+MovieLenseMeta_df
+
+```
+```{r}
+
+MovieLense_reduced_normalized <- recommenderlab::normalize(coerce(MovieLense_user_movies_reduced_df, MovieLense ))
+
+```
+
+
+# Aufgabe Seite 12
+
+Bestimme aus 5 unterschiedlichen Modellen das hinsichtlich
+Top N Empfehlungen beste Modell. Begründe deine Modellwahlen
+aufgrund der bisher gemachten Erkenntnisse und verwende als 6.
+Modell einen Top Movie Recommender (Basis: reduzierter Datensatz).
+
+1. Verwende für die Evaluierung 10 fache Kreuzvalidierung,
+2. Begründe deine Wahl der Performance Metrik,
+3. Analysiere das beste Modell für Top N Recommendations mit N gleich 10, 15, 20, 25 und 30,
+4. Optimiere dein bestes Modell hinsichtlich Hyperparameter.
+Hinweis: Verwende für den Top Movie Recommender die Filme mit den höchsten Durchschnittsratings.
+
+
+### Sources 
+
+https://michael.hahsler.net/other_courses/ICMA_Recommendation_Tools/code/evaluation.html
+https://michael.hahsler.net/other_courses/ICMA_Recommendation_Tools/code/
+
+
+Alle möglichen Recommendermodelle sind mit dieser Funktion sichtbar:
+```{r}
+recommenderRegistry$get_entry_names()
+recommenderRegistry$get_entry("UBCF", dataType="realRatingMatrix")
+recommenderRegistry$get_entry("IBCF", dataType="realRatingMatrix")
+recommenderRegistry$get_entry("SVD", dataType="realRatingMatrix")
+```
+
+
+um herauszufinden welcher Ansatz auf unseren Daten der Vielversprechenste ist, wird eine eine Cross-Validierung mit 10 separaten Splits durchgeführt. Dabei wird jeweils, dass Verhältnis der Training und Testdaten in 80% verwendet. Danach wird auf den Trainingsdaten die Kreuzvalidierung durchgeführt mit jeweils 10 Splits, die so von der Aufgabenstellung vorgegeben wurden. Eine Unterscheidung der Güte der Impliziten und Expliziten Modelle ist schwer anzustellen, da man für die Klassifikationsmetriken einen Schwellwert zur binären Übertragung definieren muss. Gemäss diesem Schwellwert können die Resultate stark variieren. Dies wird mit dem Parameter `goodRating` festgelegt.
+
+```{r}
+# Konvertieren in RealRatingmatrizen
+Movies_reduced <- coerce(MovieLense_user_movies_reduced_df, MovieLense)
+Movies_random <- coerce(Movies_random_selected_df, MovieLense)
+Movies_top_movies <- coerce(MoviesLense_random_user_top_movies_df, MovieLense)
+
+given_ratings_in_cv <- 10
+goodRating_threshold <- 3
+
+eval_explicit <- recommenderlab::evaluationScheme(data = Movies_reduced, 
+                                                 method="cross-validation" , train=80, 
+                                                 k=10, given=given_ratings_in_cv, 
+                                                 goodRating=goodRating_threshold)
+
+Movies_reduced_binarized <- binarize(Movies_reduced, minRating=3)
+eval_implicit <- recommenderlab::evaluationScheme(data=Movies_reduced_binarized,
+                                                 method="cross-validation" , train=80, 
+                                                 k=10, given=given_ratings_in_cv, 
+                                                 goodRating=goodRating_threshold)
+
+eval_top_movies <- recommenderlab::evaluationScheme(data = Movies_top_movies, 
+                                                    method="cross-validation" , train=80, 
+                                                    k=10, given=given_ratings_in_cv, 
+                                                    goodRating=goodRating_threshold)
+
+MovieLense_random_user_top_movie_norm <- recommenderlab::normalize(coerce(MoviesLense_random_user_top_movies_df, MovieLense))
+
+algorithms_explicit <- list(
+  RANDOM = list(name = "RANDOM", param = NULL),
+  IBCF_cos = list(name = "IBCF", param = list(k = 30, method = "Cosine")),
+  IBCF_pear = list(name = "IBCF", param = list(k = 30, method = "Pearson")),
+  UBCF_cos = list(name = "UBCF", param = list(nn = 30, method = "Cosine")),
+  UBCF_pear = list(name = "UBCF", param = list(nn = 30, method = "Pearson")),
+  SVD = list(name = "SVD", param = list(k = 30))
+)
+
+algorithms_implicit <- list(
+  RANDOM = list(name = "RANDOM", param = NULL),
+  IBCF_cos = list(name = "IBCF", param = list(k = 30, method = "Cosine")),
+  IBCF_jac = list(name = "IBCF", param = list(k = 30, method = "Jaccard")),
+  UBCF_cos = list(name = "UBCF", param = list(nn = 30, method = "Cosine")),
+  UBCF_jac = list(name = "UBCF", param = list(nn = 30, method = "Jaccard"))
+)
+
+n_recommendations <- c(10, 15, 20, 25, 30)
+
+results_explicit <- evaluate(x = eval_explicit, 
+                         method = algorithms_explicit, 
+                         n = n_recommendations)
+
+
+results_implicit <- evaluate(x = eval_implicit, 
+                         method = algorithms_implicit, 
+                         n = n_recommendations)
+
+
+# Plot confusion matrix
+plot_confusion_matrix <- function(eval_results){
+    tmp <- results_explicit$IBCF_cos %>%
+    getConfusionMatrix()  %>%  
+    as.list() 
+    
+    
+  
+  
+}
+
+
+tmp <- results_explicit$IBCF_cos %>%
+    getConfusionMatrix()  %>%  
+    as.list() 
+
+all_data <- data.frame()
+for (i in 1:length(tmp)){
+  df_tmp <- as.data.frame(tmp[[i]])[, c("n", "TP", "FP", "FN", "TN")]  
+  df_tmp[,"iter"]<- i
+  all_data <- rbind(all_data, df_tmp)
+  
+}
+
+all_data
+
+all_data %>%
+  group_by(iter) %>%
+  summarise(TP=mean(TP), FP=mean(FP), 
+            FN=mean(FN), TN=mean(TN)) %>%
+  #select(c(TP, FP, FN, TN)) %>%
+  round()
+
+
+
+as.data.frame(tmp[[2]])[, c("n", "TP", "FP", "FN", "TN")]
+
+
+```
+
+```{r}
+plot(results_explicit, annotate=TRUE, asp=TRUE, legend="topright")
+plot(results_implicit, annotate=TRUE, asp=TRUE, legend="topright")
+```
+**Beschreibung:**
+
+Für die ROC-Kurve werden folgende Metriken verwendet:
+
+$$TPR=Specifity=\frac{TP}{TP+FP}, FPR=1-Specitifiy=\frac{FP}{FP+TN}$$
+Die Grafik interpretiert man sodass, man die Diagonale Linie als zufällige Vorhersage gewertet wertet. Weiter möchte man durch eine möglichst hohe TPR, sprich Verhältnis der richtig posive VOrhersagen erreichen und dementsprechend ein kleines Verhältnis der FP Anteile der Vorhersagen haben. [(Narkede, 2018)](https://towardsdatascience.com/understanding-auc-roc-curve-68b2303cc9c5)
+
+Im Sinne der Expliziten Ratings wird auch mit `SVD`, sprich Singulärwertzerlegung das beste Resultat erzielt.
+Bei den impliziten Ratings sieht dies ein wenig anders aus. Obwohl die besten Resultate hier auch wieder mit dem Populären RS erreicht werden scheinen hier die IBCF Systeme mit den Jaccard und Cosine Ähnlichkeiten auch gut zu performen.
+Im weiteren Verlauf werde ich mich bei expliziten Ratings auf SVD und bei impliziten Ratings auf `Jaccard und Cosine` Ähnlichkeiten arbeiten. Nachfolgend untersuche ich die Modelle noch anhand ihrer Precision/Recall Scores.
+
+```{r}
+plot(results_explicit, "prec/rec", annotate=TRUE)
+plot(results_implicit, "prec/rec", annotate=TRUE)
+
+```
+**Beschreibung:**
+
+Die beiden geplotteten Metriken sind so definiert:
+
+$$Precision=\frac{TP}{TP+FP}, Recall=\frac{TP}{FN + TP}$$
+
+Auch hier kann ein ähnliches Bild beobachtet werden. Man kann hier vor allem sheen, dass im Sinne der Precision viel bessere Scores erzielt werden als mit Recall. Dies liegt vermutlich daran, dass die Anzahl an Vorhersagen meistens kleiner ist, als das Verhältnis der bekannten unbekannten Labels. Somit kann man daraus interpretieren, dass von den Vorhergesagten die meisten getroffen werden, doch dass es gemäss dem Recall noch einige gibt, die gar nicht getroffen wurden.
+
+
+## Optimierung Explizit
+
+Bei den ordinalen Ratings war SVD das stärkste Modell mit den Standardparametern. Bei diesen MOdell existieren noch einige Hyperparameter mit denen man noch ein besseres Modell erzielt werden kann. Diese sind die Anzahl der Nachbaren, die Anzahl der Iterationen, die verwendet werden um die Eigenkompenenten zu finden. Anzahl der Anteile der Eigenkompenten, die zur Rekonstruktion der Ratingmatrix benötigt werden.
+
+Grundlegend wird SVD als Matrizenzerlegung der Ratingmatrix $A$ angesehen als: $A \approx U\Sigma T^T$ wobei $U=\sigma(AA^T)$ der gefundenen normierten Eigenvektoren aus der Symmetrischen Matrix $AA^T$ darstellen. Für $\Sigma=\sqrt{\sigma}$ ergibt sich eine Diagonalmatrix aus Singulärwerten. Die Matrix entpricht den gefundenen Eigenvektoren aus der symmetrischen MAtrix $T = \sigma(A^TA)$. Durch das beschneiden der Matrizenzerlegung kann dadurch eine Annäherung an die Matrix $A$ erzielt werden, mit welcher unteranderem auch zuvor nicht vorhandene Werte gefüllt werden. 
+
+Vorerst blicken wir auf die Parameter des SVD-Recommenders aus Recommenderlab.
+
+```{r}
+recommenderRegistry$get_entry("SVD", dataType="realRatingMatrix")
+```
+
+
+
+```{r}
+getData(eval_explicit, "unknown")
+
+
+# Evaluation
+ev_svds <- evaluate(es_ordinal, algorithms_svd, type='topNList', n=30, progress=FALSE)
+```
+
+
+
+
+
+## Optimierung Implizit
+
+
+# Aufgabe DIY 13
+
+Implementiere eine Funktion zur effizienten Berechnungn sparsen Ähnlichkeitsmatrizen für IBCF RS und analysiere die
+Resultate für 100 zufällig gewählte Filme.
+
+1. Implementiere eine Funktion, um für ordinale Ratings effizient die Cosine
+Similarity zu berechnen,
+
+2. Implementiere eine Funktion, um für binäre Ratings effizient die Jaccard
+Similarity zu berechnen,
+
+3. Vergleiche deine Implementierung der Cosine basierten Ähnlichkeitsmatrix
+für ordinale Kundenratings mit der korrespondierenden via Open Source
+Paketen erzeugten Ähnlichkeitsmatrix,
+
+4. Vergleiche und diskutiere die Unterschiede deiner mittels Cosine Similarity
+erzeugten Ähnlichkeitsmatrizen für ordinale und normierte Kundenratings mit
+der Jaccard basierten Ähnlichkeitsmatrix.
