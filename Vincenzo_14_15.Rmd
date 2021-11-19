@@ -73,8 +73,6 @@ IBCF_reduced <- Recommender(data = getData(eval_reduced, "train"), method = "IBC
 
 
 ```{r}
-
-
 top_n_to_df <- function(topn){
   #' @description Function to transform a TopNList object to a data.frame object.
   #' @param topn Topn List
