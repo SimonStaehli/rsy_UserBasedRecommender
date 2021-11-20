@@ -37,3 +37,6 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+.ipynb_checkpoints/Vincenzo_14_15-checkpoint.ipynb
+.ipynb_checkpoints/Vincenzo_14_15-checkpoint.Rmd
+.ipynb_checkpoints/EDA_V-checkpoint.Rmd
