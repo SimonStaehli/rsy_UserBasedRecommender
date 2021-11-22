@@ -386,23 +386,16 @@ results_explicit <- evaluate(x = eval_explicit,
                          method = algorithms_explicit, 
                          n = n_recommendations)
 
-
 results_implicit <- evaluate(x = eval_implicit, 
                          method = algorithms_implicit, 
                          n = n_recommendations)
-
 
 # Plot confusion matrix
 plot_confusion_matrix <- function(eval_results){
     tmp <- results_explicit$IBCF_cos %>%
     getConfusionMatrix()  %>%  
     as.list() 
-    
-    
-  
-  
 }
-
 
 tmp <- results_explicit$IBCF_cos %>%
     getConfusionMatrix()  %>%  
@@ -413,7 +406,6 @@ for (i in 1:length(tmp)){
   df_tmp <- as.data.frame(tmp[[i]])[, c("n", "TP", "FP", "FN", "TN")]  
   df_tmp[,"iter"]<- i
   all_data <- rbind(all_data, df_tmp)
-  
 }
 
 all_data
@@ -424,8 +416,6 @@ all_data %>%
             FN=mean(FN), TN=mean(TN)) %>%
   #select(c(TP, FP, FN, TN)) %>%
   round()
-
-
 
 as.data.frame(tmp[[2]])[, c("n", "TP", "FP", "FN", "TN")]
 
@@ -465,7 +455,7 @@ Auch hier kann ein ähnliches Bild beobachtet werden. Man kann hier vor allem sh
 
 Bei den ordinalen Ratings war SVD das stärkste Modell mit den Standardparametern. Bei diesen MOdell existieren noch einige Hyperparameter mit denen man noch ein besseres Modell erzielt werden kann. Diese sind die Anzahl der Nachbaren, die Anzahl der Iterationen, die verwendet werden um die Eigenkompenenten zu finden. Anzahl der Anteile der Eigenkompenten, die zur Rekonstruktion der Ratingmatrix benötigt werden.
 
-Grundlegend wird SVD als Matrizenzerlegung der Ratingmatrix $A$ angesehen als: $A \approx U\Sigma T^T$ wobei $U=\sigma(AA^T)$ der gefundenen normierten Eigenvektoren aus der Symmetrischen Matrix $AA^T$ darstellen. Für $\Sigma=\sqrt{\sigma}$ ergibt sich eine Diagonalmatrix aus Singulärwerten. Die Matrix entpricht den gefundenen Eigenvektoren aus der symmetrischen MAtrix $T = \sigma(A^TA)$. Durch das beschneiden der Matrizenzerlegung kann dadurch eine Annäherung an die Matrix $A$ erzielt werden, mit welcher unteranderem auch zuvor nicht vorhandene Werte gefüllt werden. 
+Grundlegend wird SVD als Matrizenzerlegung der Ratingmatrix $A$ angesehen als: $A \approx U\Sigma T^T$ wobei $U=\sigma(AA^T)$ der gefundenen normierten Eigenvektoren aus der Symmetrischen Matrix $AA^T$ darstellen. Für $\Sigma=\sqrt{\sigma}$ ergibt sich eine Diagonalmatrix aus Singulärwerten. Die Matrix entpricht den gefundenen Eigenvektoren aus der symmetrischen MAtrix $T = \sigma(A^TA)$. Durch das Beschneiden der Matrizenzerlegung kann dadurch eine Annäherung an die Matrix $A$ erzielt werden, mit welcher unteranderem auch zuvor nicht vorhandene Werte gefüllt werden. 
 
 Vorerst blicken wir auf die Parameter des SVD-Recommenders aus Recommenderlab.
 
@@ -473,18 +463,13 @@ Vorerst blicken wir auf die Parameter des SVD-Recommenders aus Recommenderlab.
 recommenderRegistry$get_entry("SVD", dataType="realRatingMatrix")
 ```
 
-
-
 ```{r}
-getData(eval_explicit, "unknown")
+#getData(eval_explicit, "unknown")
 
 
 # Evaluation
-ev_svds <- evaluate(es_ordinal, algorithms_svd, type='topNList', n=30, progress=FALSE)
+#ev_svds <- evaluate(es_ordinal, algorithms_svd, type='topNList', n=30, progress=FALSE)
 ```
-
-
-
 
 
 ## Optimierung Implizit
@@ -508,3 +493,114 @@ Paketen erzeugten Ähnlichkeitsmatrix,
 4. Vergleiche und diskutiere die Unterschiede deiner mittels Cosine Similarity
 erzeugten Ähnlichkeitsmatrizen für ordinale und normierte Kundenratings mit
 der Jaccard basierten Ähnlichkeitsmatrix.
+
+
+### Cosine Similarity
+
+Effiziente Berechnung der Cosine-Similarity zwischen den einzelnen Items.
+
+$$sim(U, U)=\frac{U^TU}{||U||_2*||U||^T_2}$$
+Der Nenner repräsentiert das Skalarprodukt eines jeden Vektors mit sich selbst und kann als MAtrizenprodukt geschrieben werden. Der untere Teil repräsentiert die L2-Norm von jedem Vektor, was die Wurzel aus dem Skalarprodukt mit sich selbst geschrieben werden kann.
+
+```{r}
+library(coop)
+library(bench)
+
+
+# Cosine Similarity %*%
+item_item_cosine <- function(M, make_sparse=FALSE){
+  #M <- coerce(M, matrix())
+  if (make_sparse){
+    M <- Matrix(M, sparse = TRUE)  
+  }
+  M <- t(M) %*% M / sqrt(colSums(M**2)) %*% t(sqrt(colSums(M**2)))
+  return(M)
+}
+
+sample_mat <- Movies_reduced
+sample_mat <- as(sample_mat, "matrix")
+sample_mat <- replace_na(sample_mat, 0)
+
+cosine_custom <- item_item_cosine(M = sample_mat)
+
+cosine_package <- coop::cosine(x = sample_mat)
+err <- abs(cosine_custom - cosine_package)
+
+err <- coerce(err, matrix())
+err <- mean(err)
+print(paste("Mean Absolute Error: ", err))
+
+measure_custom <- bench::mark(item_item_cosine(M = sample_mat))
+measure_package <- bench::mark(coop::cosine(x = sample_mat))
+measure_benchmark <- rbind(measure_custom, measure_package)
+
+measure_benchmark
+
+```
+Man kann sehen, dass unsere Funktion schnellere Zeiten vorweist, als die von dem Package. Es könnte durchaus sein, dass während der Durchführung des Packages die Matrizen in ein Sparse-Format konvertiert werden bevor die Similarity gerechnet wird. Die Speicherkonsumption des Package ist jedoch besser als unsere. Für unsere Funktion haben wir noch einen zusätzlichen Paramaeter integriert mit dem man wählen kann ob die MAtrix auch in eine Sparse-Format konvertiert werden sollte.
+
+
+### Jaccard Similarity
+
+$$Jaccard Similarity = \frac{A \cap B}{A \cup B}$$
+Diese Metrik wird auch IoU genannt - Intersection over Union. Dabei wird geschaut wieviele gleiche hat es von der Kenngrösse dividiert durch die Gesamtanzhal der Elemente in $A$ und $B$.
+
+````{r}
+# No sense min work example
+foo <- sample_mat - sample_mat[, 1]
+
+# Works hardcode number
+colSums(foo == 0) / 700
+
+# Works not from dim
+colSums(foo == 0) / as.numeric(dim(foo[2]))
+
+# Types are the same 
+class(as.numeric(dim(foo[2])))
+class(700)
+
+````
+
+````{r}
+# Jaccard Sim
+item_item_jaccard <- function(X, item_count){
+  # Matches the Exact items as Equal
+  #
+  
+  # Create empty matrix
+  M <- Matrix(nrow = item_count, ncol = item_count)
+  #X <- X > 0
+  for (i in 1:item_count){
+    tmp <- X - X[, i]
+    M[i ,1:item_count] <- colSums(tmp == 0)/item_count
+  }
+  return(M)
+}
+
+foo <- item_item_jaccard(X = sample_mat, item_count = 700)
+
+foo[1,1:5]
+
+foo <- colSums(sample_mat == sample_mat[1])
+
+dim(foo)
+
+ncol(sample_mat)
+
+foo <- sample_mat > 0
+
+f <- foo == foo[,1]
+dim(f)
+
+f[1,2]
+
+jaccard_package <- proxy::dist(t(sample_mat), method="Jaccard", convert_similarities = TRUE)
+jaccard_custom <- item_item_jaccard(X = sample_mat, item_count = 700)
+
+jaccard_package[1:5]
+jaccard_custom[1:5,1]
+
+dim(jaccard_package)
+
+
+````
