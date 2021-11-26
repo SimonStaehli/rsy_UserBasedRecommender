@@ -323,6 +323,7 @@ Hinweis: Verwende für den Top Movie Recommender die Filme mit den höchsten Dur
 
 https://michael.hahsler.net/other_courses/ICMA_Recommendation_Tools/code/evaluation.html
 https://michael.hahsler.net/other_courses/ICMA_Recommendation_Tools/code/
+https://cran.r-project.org/web/packages/recommenderlab/vignettes/recommenderlab.pdf
 
 
 Alle möglichen Recommendermodelle sind mit dieser Funktion sichtbar:
@@ -342,19 +343,14 @@ Movies_reduced <- coerce(MovieLense_user_movies_reduced_df, MovieLense)
 Movies_random <- coerce(Movies_random_selected_df, MovieLense)
 Movies_top_movies <- coerce(MoviesLense_random_user_top_movies_df, MovieLense)
 
-given_ratings_in_cv <- 10
+given_ratings_in_cv <- -30 # all but
 goodRating_threshold <- 3
 
-eval_explicit <- recommenderlab::evaluationScheme(data = Movies_reduced, 
+eval_scheme <- recommenderlab::evaluationScheme(data = Movies_reduced, 
                                                  method="cross-validation" , train=80, 
                                                  k=10, given=given_ratings_in_cv, 
                                                  goodRating=goodRating_threshold)
 
-Movies_reduced_binarized <- binarize(Movies_reduced, minRating=3)
-eval_implicit <- recommenderlab::evaluationScheme(data=Movies_reduced_binarized,
-                                                 method="cross-validation" , train=80, 
-                                                 k=10, given=given_ratings_in_cv, 
-                                                 goodRating=goodRating_threshold)
 
 eval_top_movies <- recommenderlab::evaluationScheme(data = Movies_top_movies, 
                                                     method="cross-validation" , train=80, 
@@ -363,32 +359,20 @@ eval_top_movies <- recommenderlab::evaluationScheme(data = Movies_top_movies,
 
 MovieLense_random_user_top_movie_norm <- recommenderlab::normalize(coerce(MoviesLense_random_user_top_movies_df, MovieLense))
 
-algorithms_explicit <- list(
+algorithms <- list(
   RANDOM = list(name = "RANDOM", param = NULL),
   IBCF_cos = list(name = "IBCF", param = list(k = 30, method = "Cosine")),
-  IBCF_pear = list(name = "IBCF", param = list(k = 30, method = "Pearson")),
+  IBCF_jacc = list(name = "IBCF", param = list(k =30, method = "Jaccard")),
   UBCF_cos = list(name = "UBCF", param = list(nn = 30, method = "Cosine")),
-  UBCF_pear = list(name = "UBCF", param = list(nn = 30, method = "Pearson")),
+  UBCF_jacc = list(name = "UBCF", param = list(nn = 30, method = "Jaccard")),
   SVD = list(name = "SVD", param = list(k = 30))
-)
-
-algorithms_implicit <- list(
-  RANDOM = list(name = "RANDOM", param = NULL),
-  IBCF_cos = list(name = "IBCF", param = list(k = 30, method = "Cosine")),
-  IBCF_jac = list(name = "IBCF", param = list(k = 30, method = "Jaccard")),
-  UBCF_cos = list(name = "UBCF", param = list(nn = 30, method = "Cosine")),
-  UBCF_jac = list(name = "UBCF", param = list(nn = 30, method = "Jaccard"))
 )
 
 n_recommendations <- c(10, 15, 20, 25, 30)
 
-results_explicit <- evaluate(x = eval_explicit, 
-                         method = algorithms_explicit, 
-                         n = n_recommendations)
-
-results_implicit <- evaluate(x = eval_implicit, 
-                         method = algorithms_implicit, 
-                         n = n_recommendations)
+results_explicit <- evaluate(x = eval_scheme, 
+                             method = algorithms, 
+                             n = n_recommendations)
 
 # Plot confusion matrix
 plot_confusion_matrix <- function(eval_results){
@@ -397,65 +381,69 @@ plot_confusion_matrix <- function(eval_results){
     as.list() 
 }
 
-tmp <- results_explicit$IBCF_cos %>%
+extract_binary_metric_vals <- function(eval_results){
+  #' Extracts Evaluation result and returns binary metrics TP, FP, FN, TN
+  #'
+  #' Usage:
+  #' >> extract_binary_metric_vals(results$IBCF_cos)
+  
+  tmp <- results_explicit$IBCF_cos %>%
     getConfusionMatrix()  %>%  
     as.list() 
 
-all_data <- data.frame()
-for (i in 1:length(tmp)){
-  df_tmp <- as.data.frame(tmp[[i]])[, c("n", "TP", "FP", "FN", "TN")]  
-  df_tmp[,"iter"]<- i
-  all_data <- rbind(all_data, df_tmp)
+  all_data <- data.frame()
+  for (i in 1:length(tmp)){
+    df_tmp <- as.data.frame(tmp[[i]])[, c("n", "TP", "FP", "FN", "TN")]  
+    df_tmp[,"iter"]<- i
+    all_data <- rbind(all_data, df_tmp)
+  }
+  all_data <- all_data %>%
+    group_by(iter) %>%
+    summarise(TP=mean(TP), FP=mean(FP), 
+              FN=mean(FN), TN=mean(TN)) %>%
+    #select(c(TP, FP, FN, TN)) %>%
+    round()
+  
+  return(all_data)
 }
 
-all_data
 
-all_data %>%
-  group_by(iter) %>%
-  summarise(TP=mean(TP), FP=mean(FP), 
-            FN=mean(FN), TN=mean(TN)) %>%
-  #select(c(TP, FP, FN, TN)) %>%
-  round()
-
-as.data.frame(tmp[[2]])[, c("n", "TP", "FP", "FN", "TN")]
-
+#results <- extract_binary_metric_vals(results_explicit$RANDOM)
+#results
 
 ```
 
 ```{r}
 plot(results_explicit, annotate=TRUE, asp=TRUE, legend="topright")
-plot(results_implicit, annotate=TRUE, asp=TRUE, legend="topright")
 ```
 **Beschreibung:**
+
+Die Grafik zeigt die Receiver Operating Characteristic (ROC) und setzt dabei die True-Positive Rate ins Verhältnis zur False-Positive Rate.
 
 Für die ROC-Kurve werden folgende Metriken verwendet:
 
-$$TPR=Specifity=\frac{TP}{TP+FP}, FPR=1-Specitifiy=\frac{FP}{FP+TN}$$
+$$TPR=Specifity=Recall=\frac{TP}{TP+FN}, \quad FPR=1-Specitifiy=\frac{FP}{FP+TN}$$
 Die Grafik interpretiert man sodass, man die Diagonale Linie als zufällige Vorhersage gewertet wertet. Weiter möchte man durch eine möglichst hohe TPR, sprich Verhältnis der richtig posive VOrhersagen erreichen und dementsprechend ein kleines Verhältnis der FP Anteile der Vorhersagen haben. [(Narkede, 2018)](https://towardsdatascience.com/understanding-auc-roc-curve-68b2303cc9c5)
 
-Im Sinne der Expliziten Ratings wird auch mit `SVD`, sprich Singulärwertzerlegung das beste Resultat erzielt.
-Bei den impliziten Ratings sieht dies ein wenig anders aus. Obwohl die besten Resultate hier auch wieder mit dem Populären RS erreicht werden scheinen hier die IBCF Systeme mit den Jaccard und Cosine Ähnlichkeiten auch gut zu performen.
-Im weiteren Verlauf werde ich mich bei expliziten Ratings auf SVD und bei impliziten Ratings auf `Jaccard und Cosine` Ähnlichkeiten arbeiten. Nachfolgend untersuche ich die Modelle noch anhand ihrer Precision/Recall Scores.
+Im Sinne der Expliziten Ratings wird auch mit `SVD`, sprich Singulärwertzerlegung das beste Resultat erzielt. Dies ist anhand der Grafik eindeutig klar, da der Verlauf der Kurve sich am stärksten von den anderne absetzt. Diese Grafik ist jedoch mit Vorsicht zu geniessen, denn die Modelle verfügen über Hyperparameter, die in diesem Beispiel nicht optimiert wurden. Das `SVD` Modell erzielt im Sinne bei der Scores die besten Resultate für die TPR, da sie bei allen N-Recommendations die besten Werte erzielt. Bei der FPR schnitt das IBCF-Modell mit der Jaccard-Similarity am besten ab. In der Grafik sind auch Modelle zu sehen, wie die UBCF, die bei gewissen N-Recommendations schlechter abschneiden, als zufällige Recommendationen.
+Im weiteren Verlauf werden wir uns bei expliziten Ratings auf `SVD` fokussieren, aufgrund der Resultate und auch weil wir spezifsch explizite Ratings haben. 
 
 ```{r}
 plot(results_explicit, "prec/rec", annotate=TRUE)
-plot(results_implicit, "prec/rec", annotate=TRUE)
-
 ```
 **Beschreibung:**
 
+Der Plot zeigt eine Gegenüberstellung der Precision und des Recalls über N-Recommendationen hinweg. Auch hier zeichnet sich ähnliches ab. Das SVD-Modell erreicht die besten Werte für Precision und Recall. Man kann hier auch einen Reim aus der absteigenden Kurve des Precision und der zunehmenden des Recalls machen, da die Wahrscheinlichkeit für wenig N-Recommendationen eher hoch ist ein Item zu treffen, sprich ein _TP_ zu erwischen, dass im Testset vorhanden ist. Umso mehr Items empfohlen werden, desto kleiner werden die Anteile von _TP_ und es steigen die als _FP_ und _FN_ vorhergesagten.
+
 Die beiden geplotteten Metriken sind so definiert:
 
-$$Precision=\frac{TP}{TP+FP}, Recall=\frac{TP}{FN + TP}$$
+$$Precision=\frac{TP}{TP+FP}, \quad Recall=\frac{TP}{FN + TP}$$
 
-Auch hier kann ein ähnliches Bild beobachtet werden. Man kann hier vor allem sheen, dass im Sinne der Precision viel bessere Scores erzielt werden als mit Recall. Dies liegt vermutlich daran, dass die Anzahl an Vorhersagen meistens kleiner ist, als das Verhältnis der bekannten unbekannten Labels. Somit kann man daraus interpretieren, dass von den Vorhergesagten die meisten getroffen werden, doch dass es gemäss dem Recall noch einige gibt, die gar nicht getroffen wurden.
+## Parameteroptimierung
 
+Bei den Untersuchen war SVD das stärkste Modell mit den Standardparametern. Bei diesem Modell existieren noch zwei Hyperparameter mit denen man noch ein besseres Modell erzielt werden kann. Diese sind die Anzahl der Nachbaren, die Anzahl der Iterationen, die verwendet werden um die Eigenkompenenten zu finden. Anzahl der Anteile der Eigenkompenten, die zur Rekonstruktion der Ratingmatrix benötigt werden.
 
-## Optimierung Explizit
-
-Bei den ordinalen Ratings war SVD das stärkste Modell mit den Standardparametern. Bei diesen MOdell existieren noch einige Hyperparameter mit denen man noch ein besseres Modell erzielt werden kann. Diese sind die Anzahl der Nachbaren, die Anzahl der Iterationen, die verwendet werden um die Eigenkompenenten zu finden. Anzahl der Anteile der Eigenkompenten, die zur Rekonstruktion der Ratingmatrix benötigt werden.
-
-Grundlegend wird SVD als Matrizenzerlegung der Ratingmatrix $A$ angesehen als: $A \approx U\Sigma T^T$ wobei $U=\sigma(AA^T)$ der gefundenen normierten Eigenvektoren aus der Symmetrischen Matrix $AA^T$ darstellen. Für $\Sigma=\sqrt{\sigma}$ ergibt sich eine Diagonalmatrix aus Singulärwerten. Die Matrix entpricht den gefundenen Eigenvektoren aus der symmetrischen MAtrix $T = \sigma(A^TA)$. Durch das Beschneiden der Matrizenzerlegung kann dadurch eine Annäherung an die Matrix $A$ erzielt werden, mit welcher unteranderem auch zuvor nicht vorhandene Werte gefüllt werden. 
+Grundlegend wird SVD als Matrizenzerlegung der Ratingmatrix $A$ angesehen als: $A \approx U\Sigma T^T$ wobei $U=\sigma(AA^T)$ der gefundenen normierten Eigenvektoren aus der Symmetrischen Matrix $AA^T$ darstellen. Für $\Sigma=\sqrt{\sigma}$ ergibt sich eine Diagonalmatrix aus Singulärwerten. Die Matrix $T$ entpricht den gefundenen Eigenvektoren aus der symmetrischen MAtrix $T = \sigma(A^TA)$. Durch das Beschneiden der Matrizenzerlegung kann dadurch eine Annäherung an die Matrix $A$ erzielt werden, mit welcher unteranderem auch zuvor nicht vorhandene Werte gefüllt werden. 
 
 Vorerst blicken wir auf die Parameter des SVD-Recommenders aus Recommenderlab.
 
@@ -463,16 +451,32 @@ Vorerst blicken wir auf die Parameter des SVD-Recommenders aus Recommenderlab.
 recommenderRegistry$get_entry("SVD", dataType="realRatingMatrix")
 ```
 
+Der Hyperparameter _k_ dient zur Beschneidung der Matrizenzerlegung die dann zur Annäherung der Ratingmatrix genutzt wird. Desto grösser gewählt, desto besser der Fit auf den Trainingsdaten. 
+
+
 ```{r}
-#getData(eval_explicit, "unknown")
+# Evaluation 
+algorithms_svd <- list(
+  SVD_5 = list(name = "SVD", param = list(k = 5)),
+  SVD_10 = list(name = "SVD", param = list(k = 10)),
+  SVD_20 = list(name = "SVD", param = list(k = 20)),
+  SVD_30 = list(name = "SVD", param = list(k = 30)),
+  SVD_40 = list(name = "SVD", param = list(k = 40)),
+  SVD_50 = list(name = "SVD", param = list(k = 50)),
+  SVD_100 = list(name = "SVD", param = list(k = 100))
+)
 
+ev <- evaluate(eval_scheme, algorithms_svd, type="topNList", n=c(10, 15, 20, 25, 30))
 
-# Evaluation
-#ev_svds <- evaluate(es_ordinal, algorithms_svd, type='topNList', n=30, progress=FALSE)
+avg(ev)
+
+plot(ev, "prec/rec", annotate=TRUE, average=TRUE)
+plot(ev, annotate=TRUE, average=TRUE)
+
+avg(eval_ratings)
+
 ```
 
-
-## Optimierung Implizit
 
 
 # Aufgabe DIY 13
@@ -503,8 +507,18 @@ $$sim(U, U)=\frac{U^TU}{||U||_2*||U||^T_2}$$
 Der Nenner repräsentiert das Skalarprodukt eines jeden Vektors mit sich selbst und kann als MAtrizenprodukt geschrieben werden. Der untere Teil repräsentiert die L2-Norm von jedem Vektor, was die Wurzel aus dem Skalarprodukt mit sich selbst geschrieben werden kann.
 
 ```{r}
+install.packages("vegan")
+install.packages("coop")
+install.packages("bench")
+
 library(coop)
 library(bench)
+library(vegan)
+
+#helper function
+onezero <- function(nrow,ncol){
+  return(matrix(sample(c(0,1), replace=T, size=nrow*ncol), nrow=nrow))
+}
 
 
 # Cosine Similarity %*%
@@ -542,65 +556,53 @@ Man kann sehen, dass unsere Funktion schnellere Zeiten vorweist, als die von dem
 
 ### Jaccard Similarity
 
+
+- Binärisierung der Ratings
+- Matrizenprodukt ergibt gemeinsame Ratings. Dann noch für jeden Nutzer berechnen wieiviele insgesamt.
+
 $$Jaccard Similarity = \frac{A \cap B}{A \cup B}$$
-Diese Metrik wird auch IoU genannt - Intersection over Union. Dabei wird geschaut wieviele gleiche hat es von der Kenngrösse dividiert durch die Gesamtanzhal der Elemente in $A$ und $B$.
+Diese Metrik wird auch IoU genannt - Intersection over Union. Dabei wird geschaut wieviele gleiche hat es von der Kenngrösse dividiert durch die Gesamtanzhal der Elemente in $A$ und $B$. 
+
+Unsere Implementation mit Matrizenoperationen sieht so aus:
+
+$$Jaccard Similarity(X^{MxN}) = \frac{X^TX}{M-(1-X)^T(1-X)}$$
+Dabei wird aus der ordinalen Ratingmatrix eine binäre Ratingmatrix gemacht mit einem Boolean Filter in dem alle Werte grösser als 0 zu 1 werden und der Rest 0. Mit dem Matrizenprodukt $X^TX$ können nun die Sklarprodukte zwischen allen Spaltenvektoren berechnet werden. Dies wiederspricht der Intersektion. Mit dem Divident wird im eigentlichen Sinne durch $(1-X)^T(1-X)$ die Komplementärmenge von der Vereingungsmenge(Union) kalkuliert. Dies kann dann der Reihendimension von $X$ abgezogen werden, wass dann in der eigentlichen Vereinigungsmenge resultiert.
 
 ````{r}
-# No sense min work example
-foo <- sample_mat - sample_mat[, 1]
 
-# Works hardcode number
-colSums(foo == 0) / 700
 
-# Works not from dim
-colSums(foo == 0) / as.numeric(dim(foo[2]))
+sample_mat <- Movies_reduced
+sample_mat <- as(sample_mat, "matrix")
+sample_mat <- replace_na(sample_mat, 0)
 
-# Types are the same 
-class(as.numeric(dim(foo[2])))
-class(700)
-
-````
-
-````{r}
-# Jaccard Sim
-item_item_jaccard <- function(X, item_count){
-  # Matches the Exact items as Equal
-  #
+item_item_jaccard <- function(X){
+  # Binarize
+  X <- ifelse(test = X>0, yes = 1, no = 0)
+  # Calculation of Union as Matrixprod
+  intersectX <- t(X) %*% X
   
-  # Create empty matrix
-  M <- Matrix(nrow = item_count, ncol = item_count)
-  #X <- X > 0
-  for (i in 1:item_count){
-    tmp <- X - X[, i]
-    M[i ,1:item_count] <- colSums(tmp == 0)/item_count
-  }
-  return(M)
+  # Invert X
+  X <- 1 - X
+  # Calculate Complement
+  unionX <- t(X) %*% X
+  # Get union by subtracting All - Complement
+  unionX <- dim(X)[1] - unionX
+  
+  # Calc Similarity
+  jaccard_sim <- intersectX / unionX
+  
+  return(jaccard_sim)
 }
 
-foo <- item_item_jaccard(X = sample_mat, item_count = 700)
 
-foo[1,1:5]
+S <- onezero(10, 30)
 
-foo <- colSums(sample_mat == sample_mat[1])
-
-dim(foo)
-
-ncol(sample_mat)
-
-foo <- sample_mat > 0
-
-f <- foo == foo[,1]
-dim(f)
-
-f[1,2]
-
-jaccard_package <- proxy::dist(t(sample_mat), method="Jaccard", convert_similarities = TRUE)
-jaccard_custom <- item_item_jaccard(X = sample_mat, item_count = 700)
-
-jaccard_package[1:5]
-jaccard_custom[1:5,1]
-
-dim(jaccard_package)
-
-
+vegan::vegdist(t(S), method = "jaccard" ,diag = TRUE, upper = TRUE)
 ````
+```{r}
+item_item_jaccard(S)
+
+```
+
+
+
