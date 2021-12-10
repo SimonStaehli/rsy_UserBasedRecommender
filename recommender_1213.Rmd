@@ -343,7 +343,7 @@ Movies_reduced <- coerce(MovieLense_user_movies_reduced_df, MovieLense)
 Movies_random <- coerce(Movies_random_selected_df, MovieLense)
 Movies_top_movies <- coerce(MoviesLense_random_user_top_movies_df, MovieLense)
 
-given_ratings_in_cv <- -30 # all but
+given_ratings_in_cv <- 10
 goodRating_threshold <- 3
 
 eval_scheme <- recommenderlab::evaluationScheme(data = Movies_reduced, 
@@ -407,10 +407,8 @@ extract_binary_metric_vals <- function(eval_results){
   return(all_data)
 }
 
-
 #results <- extract_binary_metric_vals(results_explicit$RANDOM)
 #results
-
 ```
 
 ```{r}
@@ -451,7 +449,7 @@ Vorerst blicken wir auf die Parameter des SVD-Recommenders aus Recommenderlab.
 recommenderRegistry$get_entry("SVD", dataType="realRatingMatrix")
 ```
 
-Der Hyperparameter _k_ dient zur Beschneidung der Matrizenzerlegung die dann zur Annäherung der Ratingmatrix genutzt wird. Desto grösser gewählt, desto besser der Fit auf den Trainingsdaten. 
+Der Hyperparameter _k_ dient zur Beschneidung der Matrizenzerlegung die dann zur Annäherung der Ratingmatrix genutzt wird. Desto grösser gewählt, desto besser der Fit auf den Trainingsdaten. Desto besser die Rekonstruktion der Input-Matrix.
 
 
 ```{r}
@@ -466,17 +464,30 @@ algorithms_svd <- list(
   SVD_100 = list(name = "SVD", param = list(k = 100))
 )
 
-ev <- evaluate(eval_scheme, algorithms_svd, type="topNList", n=c(10, 15, 20, 25, 30))
+given_ratings_in_cv <- 10
+goodRating_threshold <- 3
 
-avg(ev)
+eval_scheme <- recommenderlab::evaluationScheme(data = Movies_reduced, 
+                                                 method="cross-validation" , train=80, 
+                                                 k=10, given=given_ratings_in_cv, 
+                                                 goodRating_threshold)
+
+ev <- evaluate(eval_scheme, algorithms_svd, type="topNList", n=c(10, 15, 20, 25, 30))
+eval_ratings <- evaluate(eval_scheme, algorithms_svd, type="ratings")
 
 plot(ev, "prec/rec", annotate=TRUE, average=TRUE)
-plot(ev, annotate=TRUE, average=TRUE)
-
-avg(eval_ratings)
+plot(ev, annotateesults, annotate=TRUE, average=TRUE)
 
 ```
+**Beschreibung:**
 
+Die beiden Plots zeigen ein ähnliches Resultat. Für das beste K hinsichtlich beider Metriken ist $k=5$.
+
+
+```{r}
+svd()
+
+```
 
 
 # Aufgabe DIY 13
@@ -569,8 +580,6 @@ $$Jaccard Similarity(X^{MxN}) = \frac{X^TX}{M-(1-X)^T(1-X)}$$
 Dabei wird aus der ordinalen Ratingmatrix eine binäre Ratingmatrix gemacht mit einem Boolean Filter in dem alle Werte grösser als 0 zu 1 werden und der Rest 0. Mit dem Matrizenprodukt $X^TX$ können nun die Sklarprodukte zwischen allen Spaltenvektoren berechnet werden. Dies wiederspricht der Intersektion. Mit dem Divident wird im eigentlichen Sinne durch $(1-X)^T(1-X)$ die Komplementärmenge von der Vereingungsmenge(Union) kalkuliert. Dies kann dann der Reihendimension von $X$ abgezogen werden, wass dann in der eigentlichen Vereinigungsmenge resultiert.
 
 ````{r}
-
-
 sample_mat <- Movies_reduced
 sample_mat <- as(sample_mat, "matrix")
 sample_mat <- replace_na(sample_mat, 0)
@@ -580,29 +589,80 @@ item_item_jaccard <- function(X){
   X <- ifelse(test = X>0, yes = 1, no = 0)
   # Calculation of Union as Matrixprod
   intersectX <- t(X) %*% X
-  
   # Invert X
   X <- 1 - X
   # Calculate Complement
   unionX <- t(X) %*% X
   # Get union by subtracting All - Complement
   unionX <- dim(X)[1] - unionX
-  
   # Calc Similarity
   jaccard_sim <- intersectX / unionX
   
   return(jaccard_sim)
 }
 
-
 S <- onezero(10, 30)
 
-vegan::vegdist(t(S), method = "jaccard" ,diag = TRUE, upper = TRUE)
+res_package <- vegan::vegdist(t(S), method = "jaccard" ,diag = TRUE, upper = TRUE)
+res_package <- as.matrix(res_package)
+res_custom <- item_item_jaccard(S)
+
+# Check if snippet of arraay is equal
+sum(as.integer(res_package[1:5,1:5] - (1-res_custom[1:5,1:5]))) == 0
+
 ````
+
+**Beschreibung:**
+
+Die beiden Funktionen ergeben fast das gleiche. Unsere Implementierung müsste noch mit der Funktion $Sim_{vegan}=1-Sim_{Custom}$ ergänzt werden. Wir nehmen an, dass dieses Package die Jaccard-Distanz abbildet.
+
+
 ```{r}
-item_item_jaccard(S)
+measure_custom <- bench::mark(item_item_jaccard(X = sample_mat))
+measure_package <- bench::mark(vegan::vegdist(t(sample_mat), method = "jaccard" ,
+                                              diag = TRUE, upper = TRUE))
+measure_benchmark <- rbind(measure_custom, measure_package)
+measure_benchmark$expression <- c("Custom", "Package")
+measure_benchmark
+```
+**Beschreibung:**
+
+Beim Vergleich beider Modelle kann man sehen, dass auf unserer Matrix unsere eigne Funktion besser performt. Jedoch ist auch erkennbar, dass die Speicherauslastung unserer Funktion um einiges höher liegt, als die vom Package. Dies könnte daran liegen, dass kleinere Datentypen verwendet werden oder mit Spars-Matrizen gearbeitet wird.
+
+
+### Vergleich Cosine-Jaccard
+
+4. Vergleiche und diskutiere die Unterschiede deiner mittels Cosine Similarity
+erzeugten Ähnlichkeitsmatrizen für ordinale und normierte Kundenratings mit
+der Jaccard basierten Ähnlichkeitsmatrix.
+
+```{r}
+M <- as(Movies_reduced, "matrix")
+M <- replace_na(M, 0)
+
+similarity_matrix_cosine <- item_item_cosine(M=M)
+similarity_matrix_cosine <- colMeans(similarity_matrix_cosine)
+col_means_cosine <- as.data.frame(similarity_matrix_cosine)
+
+p1 <- hist(col_means_cosine$similarity_matrix_cosine, xlab="Column Means", main = "Col Means: Cosine Similarity on ordinal Ratings", col = "grey")
+
+
+normalized_ratings <- recommenderlab::normalize(Movies_reduced)
+N <- as(normalized_ratings, "matrix")
+N <- replace_na(N, 0)
+
+similarity_matrix_jaccard <- item_item_jaccard(X = N)
+similarity_matrix_jaccard <- colMeans(similarity_matrix_jaccard)
+col_means_jaccard <- as.data.frame(similarity_matrix_jaccard)
+
+p2 <- hist(col_means_jaccard$similarity_matrix_jaccard, xlab="Column Means", main = "Col Means: Jaccard Similarity on Normed Ratings", col = "grey")
 
 ```
 
+**Beschreibung:**
+
+Der linke Plot zeigt das Historgram für die Mean Ratings pro Item, die mit anhand der Cosine Similarity berechnet wurde und der zweite Plot die kalkulierten Mean Ratings pro Produkt mit der Jaccard Similarity.
+
+Die Unterscheidung fällt bereits anhand der Skala auf, die Durchschnittlichen Kosinus-Similaritäten sind um einiges grösser, als die Durchschnittlichen Ratings der Jaccard-Similairtäten. Eine plausible Erklärung bietet die Sparsity, welche grundsätzlich hoch ist, da viele Filme auch im reduzierten Datensatz von wenigen Usern geschaut wurden. Deshalb die Überschneidungen (Intersection) da eher klein sind zwischen einzelnen Usern. Jaccard rechnet nur mit den konsumierten Filmen, wohingegeben Cosine auch Ähnlichkeiten zwischen Nicht geschauten Filmen miteinkalkuliert. Die beiden Funktionen unterscheiden sich grundlegend voneinander.
 
 
