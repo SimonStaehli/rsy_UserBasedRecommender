@@ -323,6 +323,244 @@ MovieLense_reduced_normalized <- recommenderlab::normalize(coerce(MovieLense_use
 
 ```
 
+----------------
+
+# Aufgabe Seite 10
+
+Untersuche den Einfluss von Ratings (ordinale vs binäre
+Ratings) und Modelltyp (IBCF vs UBCF) auf Top-N Empfehlungen für den
+reduzierten Datensatz.
+  1.Vergleiche den Anteil übereinstimmender Empfehlungen der Top-15 Liste für
+    IBCF vs UBCF, beide mit ordinalem Rating und Cosine Similarity für alle
+    Testkunden,
+  2.Vergleiche den Anteil übereinstimmender Empfehlungen der Top-15 Liste für
+    IBCF vs UBCF, beide mit binärem Rating und Jaccard Similarity für alle
+    Testkunden,
+  3.Vergleiche den Anteil übereinstimmender Empfehlungen der Top-15 Liste für
+    UBCF mit ordinalem (Cosine Similarity) vs binärem Rating (Jaccard Similarity)
+    für alle Testkunden.
+
+```{r}
+
+Recommender_model_IBCF_cosine <- Recommender(data = train_test_reduced[[1]], method = "IBCF", parameter = list(method = "Cosine",k=30))
+Recommender_model_UBCF_cosine <- Recommender(data = train_test_reduced[[1]], method = "UBCF", parameter = list(method = "Cosine",nn=30))
+
+
+reduced_binär <- binarize(train_test_reduced[[1]], minRating=2)
+
+Recommender_model_IBCF_jaccard <- Recommender(data = train_test_reduced[[1]], method='IBCF', parameter=list(method='Jaccard',k=30))
+Recommender_model_UBCF_jaccard <- Recommender(data = train_test_reduced[[1]], method='UBCF', parameter=list(method='Jaccard',nn=30))
+
+```
+
+```{r}
+NUM_RECOMMENDATIONS <- 15
+
+Recommender_model_IBCF_cosine_top15 <-  predict(Recommender_model_IBCF_cosine, newdata=test, n=NUM_RECOMMENDATIONS)
+Recommender_model_UBCF_cosine_top15 <-  predict(Recommender_model_UBCF_cosine, newdata=test, n=NUM_RECOMMENDATIONS)
+Recommender_model_IBCF_jaccard_top15 <-  predict(Recommender_model_IBCF_jaccard, newdata=test, n=NUM_RECOMMENDATIONS)
+Recommender_model_UBCF_jaccard_top15 <-  predict(Recommender_model_UBCF_jaccard, newdata=test, n=NUM_RECOMMENDATIONS)
+```
+
+```{r}
+Recommender_model_IBCF_cosine_top15_pred <- data.frame(user = sort(rep(1:length(Recommender_model_IBCF_cosine_top15@items),
+                                                                       Recommender_model_IBCF_cosine_top15@n)),
+                                                       rating = unlist(Recommender_model_IBCF_cosine_top15@ratings),
+                                                       index = unlist(Recommender_model_IBCF_cosine_top15@items))
+Recommender_model_UBCF_cosine_top15_pred <- data.frame(user = sort(rep(1:length(Recommender_model_UBCF_cosine_top15@items),
+                                                                       Recommender_model_UBCF_cosine_top15@n)),
+                                                       rating = unlist(Recommender_model_UBCF_cosine_top15@ratings),
+                                                       index = unlist(Recommender_model_UBCF_cosine_top15@items))
+
+
+Recommender_model_IBCF_jaccard_top15_pred <- data.frame(user = sort(rep(1:length(Recommender_model_IBCF_jaccard_top15@items),
+                                                                       Recommender_model_IBCF_jaccard_top15@n)),
+                                                       rating = unlist(Recommender_model_IBCF_jaccard_top15@ratings),
+                                                       index = unlist(Recommender_model_IBCF_jaccard_top15@items))
+Recommender_model_UBCF_jaccard_top15_pred <- data.frame(user = sort(rep(1:length(Recommender_model_UBCF_jaccard_top15@items),
+                                                                       Recommender_model_UBCF_jaccard_top15@n)),
+                                                       rating = unlist(Recommender_model_UBCF_jaccard_top15@ratings),
+                                                       index = unlist(Recommender_model_UBCF_jaccard_top15@items))
+
+```
+
+
+```{r}
+similarity_cosine = c()
+
+for (user in unique(Recommender_model_IBCF_cosine_top15_pred$user)) {
+  top_n_user_1 <- Recommender_model_IBCF_cosine_top15_pred[Recommender_model_IBCF_cosine_top15_pred$user == user,"index"]
+  top_n_user_2 <- Recommender_model_UBCF_cosine_top15_pred[Recommender_model_UBCF_cosine_top15_pred$user == user,"index"]
+  tt <- length(intersect(top_n_user_1,top_n_user_2))/15
+  similarity_cosine <- append(similarity_cosine,tt)
+}
+
+summary(similarity_cosine)
+similarity_cosine
+
+ggplot(mapping = aes(x=similarity_cosine)) +
+  geom_histogram(fill="grey", na.rm=TRUE,bins = 10) +
+  ggtitle(paste("Anteil Übereinstimmeungen für IBCF vs UBCF mit Cosine Similarity"))+
+  xlab("Verhältnis")
+```
+In der Grafik sehen wir die Verteilung der Übereinstimmungen für IBCF vs UBCF mit ordinalem Rating und Cosine Similarity für alle Testkunden. Wir können feststellen, dass bei den meisten Usern keine bis ganz wenig eine Übereinstimmung haben. Bei einem User haben wir eine Übereinstimmung von 40%, was sehr hoch ist. Dies bedeutet das von 15 Filmen davon 6 in beiden Listen vorkommt.
+
+
+```{r}
+similarity_jaccard = c()
+
+for (user in unique(Recommender_model_IBCF_jaccard_top15_pred$user)) {
+  top_n_user_1 <- Recommender_model_IBCF_jaccard_top15_pred[Recommender_model_IBCF_jaccard_top15_pred$user == user,"index"]
+  top_n_user_2 <- Recommender_model_UBCF_jaccard_top15_pred[Recommender_model_UBCF_jaccard_top15_pred$user == user,"index"]
+  tt <- length(intersect(top_n_user_1,top_n_user_2))/15
+  similarity_jaccard <- append(similarity_jaccard,tt)
+}
+
+summary(similarity_jaccard)
+similarity_jaccard
+
+
+ggplot(mapping = aes(x=similarity_jaccard)) +
+  geom_histogram(fill="grey", na.rm=TRUE,bins = 10) +
+  ggtitle(paste("Anteil Übereinstimmeungen für IBCF vs UBCF mit Jaccard Similarity"))+
+  xlab("Verhältnis")
+```
+In dieser Grafik sehen wir die Verteilung der Übereinstimmungen für IBCF vs UBCF mit diesmal binärem Rating und Jaccard Similarity für alle Testkunden. Hier sehen wir sofort, dass wir eine viel schwächere Übereinstimmung haben als mit der Cosine Similarity. Fast alle User haben keine Übereinstimmungen. Nur 2 User haben eine Übereinstimmung von 6.6% (1 Film) und 2 User eine Übereinstimmung von 13.3% (2 Filme).
+
+
+
+
+```{r}
+similarity_UBCF = c()
+
+for (user in unique(Recommender_model_UBCF_cosine_top15_pred$user)) {
+  top_n_user_1 <- Recommender_model_UBCF_cosine_top15_pred[Recommender_model_UBCF_cosine_top15_pred$user == user,"index"]
+  top_n_user_2 <- Recommender_model_UBCF_jaccard_top15_pred[Recommender_model_UBCF_jaccard_top15_pred$user == user,"index"]
+  tt <- length(intersect(top_n_user_1,top_n_user_2))/15
+  similarity_UBCF <- append(similarity_UBCF,tt)
+}
+
+summary(similarity_UBCF)
+similarity_UBCF
+
+ggplot(mapping = aes(x=similarity_UBCF)) +
+  geom_histogram(fill="grey", na.rm=TRUE,bins = 10) +
+  ggtitle(paste("Anteil Übereinstimmeungen UBCF mit Cosine Similarity und Jaccard Similarity")) +
+  xlab("Verhältnis")
+```
+In dieser Grafik vergleichen wir jetzt die Übereinstimmungen für UBCF mit ordinalem (Cosine Similarity) vs binärem Rating (Jaccard Similarity) für alle Testkunden. Hier können wir sagen, dass wir generell die viele Übereinstimmungen haben. Nur 6 User haben gar keine Übereinstimmung.
+
+
+
+----------------
+
+# Aufgabe Seite 11
+
+Aufgabe: Vergleiche Memory-based IBCF und Modell-based SVD
+Recommenders bezüglich Überschneidung ihrer Top-N Empfehlungen
+für die User-Item Matrix des reduzierten Datensatzes (Basis: IBCF mit
+30 Nachbarn und Cosine Similarity).
+  1.Vergleiche wie sich der Anteil übereinstimmender Empfehlungen der Top-15
+    Liste für IBCF vs verschiedene SVD Modelle verändert, wenn die Anzahl der
+    Singulärwerte für SVD von 10 auf 20, 30, 40, 50 verändert wird.
+
+
+
+```{r}
+Recommender_model_SVD_10 <- Recommender(data = train_test_reduced[[1]], method = "SVD", parameter = list(k = 10))
+Recommender_model_SVD_20 <- Recommender(data = train_test_reduced[[1]], method = "SVD", parameter = list(k = 20))
+Recommender_model_SVD_30 <- Recommender(data = train_test_reduced[[1]], method = "SVD", parameter = list(k = 30))
+Recommender_model_SVD_40 <- Recommender(data = train_test_reduced[[1]], method = "SVD", parameter = list(k = 40))
+Recommender_model_SVD_50 <- Recommender(data = train_test_reduced[[1]], method = "SVD", parameter = list(k = 50))
+
+NUM_RECOMMENDATIONS <- 15
+
+Recommender_model_SVD_10_top15 <-  predict(Recommender_model_SVD_10, newdata=test, n=NUM_RECOMMENDATIONS)
+Recommender_model_SVD_20_top15 <-  predict(Recommender_model_SVD_20, newdata=test, n=NUM_RECOMMENDATIONS)
+Recommender_model_SVD_30_top15 <-  predict(Recommender_model_SVD_30, newdata=test, n=NUM_RECOMMENDATIONS)
+Recommender_model_SVD_40_top15 <-  predict(Recommender_model_SVD_40, newdata=test, n=NUM_RECOMMENDATIONS)
+Recommender_model_SVD_50_top15 <-  predict(Recommender_model_SVD_50, newdata=test, n=NUM_RECOMMENDATIONS)
+
+
+
+Recommender_model_SVD_10_top15_pred <- data.frame(user = sort(rep(1:length(Recommender_model_SVD_10_top15@items),Recommender_model_SVD_10_top15@n)),
+                                                       rating = unlist(Recommender_model_SVD_10_top15@ratings),index = unlist(Recommender_model_SVD_10_top15@items))
+Recommender_model_SVD_20_top15_pred <- data.frame(user = sort(rep(1:length(Recommender_model_SVD_20_top15@items),Recommender_model_SVD_20_top15@n)),
+                                                       rating = unlist(Recommender_model_SVD_20_top15@ratings),index = unlist(Recommender_model_SVD_20_top15@items))
+Recommender_model_SVD_30_top15_pred <- data.frame(user = sort(rep(1:length(Recommender_model_SVD_30_top15@items),Recommender_model_SVD_30_top15@n)),
+                                                       rating = unlist(Recommender_model_SVD_30_top15@ratings),index = unlist(Recommender_model_SVD_30_top15@items))
+Recommender_model_SVD_40_top15_pred <- data.frame(user = sort(rep(1:length(Recommender_model_SVD_40_top15@items),Recommender_model_SVD_40_top15@n)),
+                                                       rating = unlist(Recommender_model_SVD_40_top15@ratings),index = unlist(Recommender_model_SVD_40_top15@items))
+Recommender_model_SVD_50_top15_pred <- data.frame(user = sort(rep(1:length(Recommender_model_SVD_50_top15@items),Recommender_model_SVD_50_top15@n)),
+                                                       rating = unlist(Recommender_model_SVD_50_top15@ratings),index = unlist(Recommender_model_SVD_50_top15@items))
+
+```
+
+
+```{r}
+similarity_SVD_10 = c()
+for (user in unique(Recommender_model_IBCF_cosine_top15_pred$user)) {
+  top_n_user_1 <- Recommender_model_IBCF_cosine_top15_pred[Recommender_model_IBCF_cosine_top15_pred$user == user,"index"]
+  top_n_user_2 <- Recommender_model_SVD_10_top15_pred[Recommender_model_SVD_10_top15_pred$user == user,"index"]
+  tt <- length(intersect(top_n_user_1,top_n_user_2))/15
+  similarity_SVD_10 <- append(similarity_SVD_10,tt)}
+similarity_SVD_20 = c()
+for (user in unique(Recommender_model_IBCF_cosine_top15_pred$user)) {
+  top_n_user_1 <- Recommender_model_IBCF_cosine_top15_pred[Recommender_model_IBCF_cosine_top15_pred$user == user,"index"]
+  top_n_user_2 <- Recommender_model_SVD_20_top15_pred[Recommender_model_SVD_20_top15_pred$user == user,"index"]
+  tt <- length(intersect(top_n_user_1,top_n_user_2))/15
+  similarity_SVD_20 <- append(similarity_SVD_20,tt)}
+similarity_SVD_30 = c()
+for (user in unique(Recommender_model_IBCF_cosine_top15_pred$user)) {
+  top_n_user_1 <- Recommender_model_IBCF_cosine_top15_pred[Recommender_model_IBCF_cosine_top15_pred$user == user,"index"]
+  top_n_user_2 <- Recommender_model_SVD_30_top15_pred[Recommender_model_SVD_30_top15_pred$user == user,"index"]
+  tt <- length(intersect(top_n_user_1,top_n_user_2))/15
+  similarity_SVD_30 <- append(similarity_SVD_30,tt)}
+similarity_SVD_40 = c()
+for (user in unique(Recommender_model_IBCF_cosine_top15_pred$user)) {
+  top_n_user_1 <- Recommender_model_IBCF_cosine_top15_pred[Recommender_model_IBCF_cosine_top15_pred$user == user,"index"]
+  top_n_user_2 <- Recommender_model_SVD_40_top15_pred[Recommender_model_SVD_40_top15_pred$user == user,"index"]
+  tt <- length(intersect(top_n_user_1,top_n_user_2))/15
+  similarity_SVD_40 <- append(similarity_SVD_40,tt)}
+similarity_SVD_50 = c()
+for (user in unique(Recommender_model_IBCF_cosine_top15_pred$user)) {
+  top_n_user_1 <- Recommender_model_IBCF_cosine_top15_pred[Recommender_model_IBCF_cosine_top15_pred$user == user,"index"]
+  top_n_user_2 <- Recommender_model_SVD_50_top15_pred[Recommender_model_SVD_50_top15_pred$user == user,"index"]
+  tt <- length(intersect(top_n_user_1,top_n_user_2))/15
+  similarity_SVD_50 <- append(similarity_SVD_50,tt)}
+```
+
+
+
+
+
+
+```{r}
+
+similarity_SVD_10_mean = mean(similarity_SVD_10)
+similarity_SVD_20_mean = mean(similarity_SVD_20)
+similarity_SVD_30_mean = mean(similarity_SVD_30)
+similarity_SVD_40_mean = mean(similarity_SVD_40)
+similarity_SVD_50_mean = mean(similarity_SVD_50)
+
+means = c(similarity_SVD_10_mean,similarity_SVD_20_mean,similarity_SVD_30_mean,similarity_SVD_40_mean,similarity_SVD_50_mean)
+svds = c(10,20,30,40,50)
+
+```
+
+
+```{r}
+b <- data.frame(svd=svds, mean=means)
+plot(b,
+     main="Übereinstimmender Empfehlungen der Top-15 Liste ",
+     xlab="Singulärwerte für SVD",
+     ylab="Durchschnitt der Übereinstimmung",)
+
+```
+In dieser Grafik überprüfen wir, wie sich der Anteil übereinstimmender Empfehlungen der Top-15 Liste für IBCF zu verschiedene SVD Modelle verändert, wenn wir die Anzahl der Singulärwerte für SVD verändern. Die Übereinstimmung variiert von ca. 9% bis 10%. keine allzu starke Schwankung. Dadurch können wir sagen, dass die Änderung der Singulärwerte von SVD keinen grossen Einfluss auf die Übereinstimmung haben
+
+
+
 
 ----------------
 
