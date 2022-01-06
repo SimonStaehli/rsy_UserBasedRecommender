@@ -13,13 +13,6 @@ library(gridExtra)
 library(reshape2)
 library(fmsb)
 ```
-
-Aufgabe: Reduziere den MovieLense Datensatz auf rund 400 Kunden 
-und 700 Filme, indem du Filme und Kunden  mit sehr wenigen Ratings 
-entfernst.
-Untersuche und dokumentiere die Eigenschaften des reduzierten 
-Datensatzes und beschreibe den Effekt der Datenreduktion:
-  1.Anzahl Filme und Kunden sowie Sparsity vor und nach Datenreduktion
 ```{r}
 data(MovieLense)
 MovieLense_df <- as(MovieLense, "data.frame")
@@ -64,7 +57,9 @@ IBCF_reduced <- Recommender(data = getData(eval_reduced, "train"), method = "IBC
                             parameter = list(k = 3, method = "Cosine", na_as_zero=TRUE))
 
 ```
-
+1.Implementiere eine Funktion, um aus Top-N Listen für alle Kunden die Item-
+space Coverage@N und Novelty@N eines Recommenders zu beurteilen und
+teste diese.
 
 ```{r}
 top_n_to_df <- function(top_n){
@@ -90,14 +85,14 @@ calc_coverage <- function(top_n, n_movies=1664){
   return (n_unique_pred_movies / n_movies)
 }
 
-calc_popularity <- function(MovieLenseData, n_movies=1664){
+calc_popularity <- function(MovieLenseData, n_users=943){
   #' @description Function, which returns coverage as described here: https://ds-spaces.technik.fhnw.ch/6rsy/2021/05/02/recommender-system-evaluierung-coverage-und-novelty/
   #' @param MovieLenseData Movielense data.frame, containing how a user has rated a movie.
   #' @param n_movies How many total movies there are. In the MovielenseDB, there are 1664 Movies.
   
   popularity_movie <- MovieLenseData %>%
     count(item) %>%
-    mutate(popularity = log2(n / n_movies)) %>%
+    mutate(popularity = n / n_users) %>%
     select(item, popularity)
   return (popularity_movie)
   
@@ -132,11 +127,41 @@ calc_novelty <- function(top_n, MovieLenseData, n_movies=1664){
   return (novelty)
 }
 ```
+```{r}
+popularity_movie <- MovieLense_df %>%
+  count(item) %>%
+  mutate(popularity = n / 943) %>%
+  select(item, popularity)
+
+top_n_df <- top_n_to_df(top_n)
+  
+group_size_user = top_n_df %>%
+  group_by(user) %>%
+  summarise(n = n()) %>%
+  select(user, n)
+
+top_n_df <- top_n_df %>%
+  left_join(group_size_user, by = 'user')
+
+top_n_popularity_df <- top_n_df %>%
+  inner_join(popularity_movie, by = 'item') %>%
+  mutate(popularity = log2(popularity) / n)
+
+novelty = sum(top_n_popularity_df$popularity)
+
+S = length(unique(MovieLense_df$user))
+
+novelty = - novelty / S
+novelty
+```
+```{r}
+top_n_popularity_df
+```
 
 
 
 ```{r}
-top_n = predict(object = IBCF_reduced, newdata = getData(eval_reduced, "unknown"), n = 15)
+top_n = predict(object = IBCF_reduced, newdata = getData(eval_reduced, "unknown"), n = 1)
 ```
 
 
@@ -147,14 +172,14 @@ calc_novelty(top_n, MovieLense_df)
 
 
 ```{r}
-n_list = c(1, 3, 5, 10, 15, 20)
-given_list = c(3, 5, 15)
+n_list = c(3:15)
+given_list = c(3:7)
 ```
 
 
 ```{r}
 # Test coverage and novelty on 5, 10, 15, 20, 25 and 30 top_n predictions.
-
+options(warn = - 1)   
 coverage <- matrix(, nrow = length(n_list), ncol = length(given_list), dimnames=list(n_list,given_list))
 novelty <- matrix(, nrow = length(n_list), ncol = length(given_list), dimnames=list(n_list,given_list))
 
@@ -173,18 +198,22 @@ for(n in 1:length(n_list)){
 }
 
 ```
-
-
 ```{r}
-coverage
+melted_coverage <- melt(coverage, value.name = "Coverage", varnames=c('N', 'given'))
+melted_novelty <- melt(novelty, value.name = "Novelty", varnames=c('N', 'given'))
 ```
 
-Man sieht, dass bei der Coverage der Parameter N einen grossen Einfluss hat. Dagegen hat der Parameter "Given" einen kleineren Einfluss. Wenn man also die Coverage maximieren will, sollte man ein grössmöchglistes N wählen.
-
 ```{r}
-novelty
+ggplot(data = melted_coverage, aes(x=N, y=given, fill=Coverage)) + 
+  geom_raster()
+
+ggplot(data = melted_novelty, aes(x=N, y=given, fill=Novelty)) + 
+  geom_raster()
 ```
-Die Novelty verändert sich wenig zwischen den Paramater. Dies ergibt aber auch Sinn, da wenn ein Model Grundlegend keine unbekannten Filme empfiehlt, ändert die Top N Liste auch nur wenig dran.
+Man sieht, dass bei der Coverage der Parameter N einen grossen Einfluss hat. Dagegen hat der Parameter "Given" einen kleineren Einfluss. Wenn man also die Coverage maximieren will, sollte man ein grössmöglichstes N wählen.
+
+
+Die Novelty verändert sich hingegen wenig zwischen den Parameter. Dies ergibt aber auch Sinn, da wenn ein Model grundlegend keine unbekannten Filme empfiehlt, ändert der Parameter N und der Parameter given nur wenig dran.
 
 
 ```{r}
@@ -236,7 +265,7 @@ test_user_selected = getData(eval_reduced, "unknown")[random_user_idx]
 Zuerst schauen wir, basierend auf Precision, Recall, Novelty und Coverage, welche Modelle überhaupt interessant sind.
 ```{r}
 # Random Users:
-set.seed(42)
+set.seed(SEED)
 
 algorithms <- list(
     "IBCF, z-score, cos" = list(name="IBCF", param=list(normalize = "Z-score",
@@ -270,7 +299,7 @@ Wir sehen, dass hier SVD sehr gut abschneidet. IBCF scheint besser zu sein als U
 
 ```{r}
 # Random Users:
-set.seed(42)
+set.seed(SEED)
 
 algorithms <- list(
     "UBCF, z-score, cos" = list(name="UBCF", param=list(normalize = "Z-score",
@@ -309,7 +338,7 @@ Bei SVD können wir uns noch die Dimensionen genauer anschauen.
 
 ```{r}
 # Random Users:
-set.seed(42)
+set.seed(SEED)
 
 algorithms <- list(
     "SVD, 2" = list(name='SVD', param=list(k=2)),
@@ -349,7 +378,7 @@ Wie beeinflust der Threshold für das Berechnen der TRP und FRP?
 
 ```{r}
 # Random Users:
-set.seed(42)
+set.seed(SEED)
 
 algorithms <- list(
     "UBCF, z-score, cos" = list(name="UBCF", param=list(normalize = "Z-score",
