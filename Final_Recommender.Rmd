@@ -1184,10 +1184,10 @@ given_list = c(3:7)
 ```{r}
 # Test coverage and novelty on 5, 10, 15, 20, 25 and 30 top_n predictions.
 options(warn = - 1)   
-coverage_svd <- matrix(, nrow = length(n_list), ncol = length(given_list), dimnames=list(n_list,given_list))
-novelty_svd <- matrix(, nrow = length(n_list), ncol = length(given_list), dimnames=list(n_list,given_list))
-coverage_ibcf <- matrix(, nrow = length(n_list), ncol = length(given_list), dimnames=list(n_list,given_list))
-novelty_ibcf <- matrix(, nrow = length(n_list), ncol = length(given_list), dimnames=list(n_list,given_list))
+coverage_svd <- matrix(nrow = length(n_list), ncol = length(given_list), dimnames=list(n_list,given_list))
+novelty_svd <- matrix(nrow = length(n_list), ncol = length(given_list), dimnames=list(n_list,given_list))
+coverage_ibcf <- matrix(nrow = length(n_list), ncol = length(given_list), dimnames=list(n_list,given_list))
+novelty_ibcf <- matrix(nrow = length(n_list), ncol = length(given_list), dimnames=list(n_list,given_list))
 
 for(n in 1:length(n_list)){
     for (g in 1:length(given_list)){
@@ -1236,7 +1236,7 @@ ggplot(data = melted_novelty_ibcf, aes(x=N, y=given, fill=Novelty)) +
 ***Beschreibung***
 Lesebeispiel: Es ist eine Heatmap. Wenn man z.B. bei given = 4 und N = 8 auf das Feld schaut, wo sie sich keuzen, können wir anhand der Farben den Wert der Novelty und Coverage abgelesen.
 
-Sowohl bei der Coverage, als auch bei der Novelty hat der Parameter N einen grossen einfluss. Falls man diese beiden maximieren möchte, sollte man ein mögichst hohes N wählen. Given beeinflusst die beiden Metriken fast gar nicht. Dies ist identisch bei beiden Modellen. Interessanterweise erreicht das SVD5 Modell aber einen höheren Wert. Im unteren Plot ist kann man die Summe der beiden Metriken ablesen.
+Sowohl bei der Coverage, als auch bei der Novelty hat der Parameter N einen grossen einfluss. Falls man diese beiden maximieren möchte, sollte man ein mögichst hohes N wählen. Given beeinflusst die beiden Metriken fast gar nicht und das ist identisch bei beiden Modellen. Interessanterweise erreicht das SVD5 Modell aber einen höheren Wert und dies überprüfen wir im nächsten Plot. 
 
 ```{r}
 df <- data.frame(Value=c(sum(melted_novelty_ibcf$Novelty), sum(melted_novelty_svd$Novelty), sum(melted_coverage_ibcf$Coverage), sum(melted_coverage_svd$Coverage)),
@@ -1248,7 +1248,8 @@ p<-ggplot(data=df, aes(x=Metric, y=Value)) +
   ggtitle('Novelty and Coverage of Models SVD5 and IBCF')
 p
 ```
-
+***Beschreibung***
+Hier sehen wir die Summe der Werte über die ganze Heatmap und tatsächlich erreicht hier das Modell SVD bei der Coverage und der Novelty einen höheren Wert. 
 
 ```{r}
 avg_to_df <- function(evlist){
