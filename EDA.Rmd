@@ -8,9 +8,6 @@ library("dplyr")
 library("tidyr")
 library("ggplot2")
 data("MovieLense")
-### use only users with more than 100 ratings
-MovieLense100 <- MovieLense[rowCounts(MovieLense) >100,]
-MovieLense100
 ```
 
 ```{r}

@@ -47,6 +47,11 @@ Movie_Genre <- MovieLenseMeta %>%
 ```
 
 
+
+1.Implementiere eine Funktion, um aus Top-N Listen für alle Kunden die Item-
+space Coverage@N und Novelty@N eines Recommenders zu beurteilen und
+teste diese.
+
 ```{r}
 set.seed(SEED)
 eval_reduced <- recommenderlab::evaluationScheme(data = coerce(MovieLense_user_movies_reduced_df, MovieLense), 
@@ -57,9 +62,6 @@ IBCF_reduced <- Recommender(data = getData(eval_reduced, "train"), method = "IBC
                             parameter = list(k = 3, method = "Cosine", na_as_zero=TRUE))
 
 ```
-1.Implementiere eine Funktion, um aus Top-N Listen für alle Kunden die Item-
-space Coverage@N und Novelty@N eines Recommenders zu beurteilen und
-teste diese.
 
 ```{r}
 top_n_to_df <- function(top_n){
@@ -116,7 +118,7 @@ calc_novelty <- function(top_n, MovieLenseData, n_movies=1664){
   
   top_n_popularity_df <- top_n_df %>%
     inner_join(popularity, by = 'item') %>%
-    mutate(popularity = popularity / n)
+    mutate(popularity = log2(popularity / n))
   
   novelty = sum(top_n_popularity_df$popularity)
   
@@ -127,55 +129,11 @@ calc_novelty <- function(top_n, MovieLenseData, n_movies=1664){
   return (novelty)
 }
 ```
-```{r}
-popularity_movie <- MovieLense_df %>%
-  count(item) %>%
-  mutate(popularity = n / 943) %>%
-  select(item, popularity)
-
-top_n_df <- top_n_to_df(top_n)
-  
-group_size_user = top_n_df %>%
-  group_by(user) %>%
-  summarise(n = n()) %>%
-  select(user, n)
-
-top_n_df <- top_n_df %>%
-  left_join(group_size_user, by = 'user')
-
-top_n_popularity_df <- top_n_df %>%
-  inner_join(popularity_movie, by = 'item') %>%
-  mutate(popularity = log2(popularity) / n)
-
-novelty = sum(top_n_popularity_df$popularity)
-
-S = length(unique(MovieLense_df$user))
-
-novelty = - novelty / S
-novelty
-```
-```{r}
-top_n_popularity_df
-```
-
-
-
-```{r}
-top_n = predict(object = IBCF_reduced, newdata = getData(eval_reduced, "unknown"), n = 1)
-```
-
-
-```{r}
-calc_coverage(top_n)
-calc_novelty(top_n, MovieLense_df)
-```
-
 
 ```{r}
 n_list = c(3:15)
 given_list = c(3:7)
 ```
-
 
 ```{r}
 # Test coverage and novelty on 5, 10, 15, 20, 25 and 30 top_n predictions.
@@ -205,15 +163,17 @@ melted_novelty <- melt(novelty, value.name = "Novelty", varnames=c('N', 'given')
 
 ```{r}
 ggplot(data = melted_coverage, aes(x=N, y=given, fill=Coverage)) + 
-  geom_raster()
+  geom_raster() +
+  ggtitle('Coverage given vs. N')
 
 ggplot(data = melted_novelty, aes(x=N, y=given, fill=Novelty)) + 
-  geom_raster()
+  geom_raster() +
+  ggtitle('Novelty given vs. N')
 ```
 Man sieht, dass bei der Coverage der Parameter N einen grossen Einfluss hat. Dagegen hat der Parameter "Given" einen kleineren Einfluss. Wenn man also die Coverage maximieren will, sollte man ein grössmöglichstes N wählen.
 
 
-Die Novelty verändert sich hingegen wenig zwischen den Parameter. Dies ergibt aber auch Sinn, da wenn ein Model grundlegend keine unbekannten Filme empfiehlt, ändert der Parameter N und der Parameter given nur wenig dran.
+Die Novelty verändert sich ebenfalls mit dem Parameter N und wenig mit dem Parameter given. Um die Novelty zu  maximieren, sollte man N erhöhen.
 
 
 ```{r}
@@ -586,7 +546,7 @@ top_n_genres <- function(top_n, Movie_Genre, col_name){
         left_join(Movie_Genre, by='item') %>%
         group_by(user, genre)  %>%
         summarise(n = n()) %>% 
-        mutate(percent =  100 *n/sum(n))
+        mutate(percent =  100 * n/sum(n))
     genres_top_n[,col_name] = genres_top_n$percent
     return (genres_top_n)
 }
@@ -696,9 +656,6 @@ ggplot(SVD_10_top_n_genre, aes(x = user, y = percent, fill = genre)) +
 
 3. Bestimme pro Kunde den Anteil nach Genres seiner Top-Filme (=Filme, 
 welche vom Kunden die besten Bewertungen erhalten haben),
-```{r}
-```
-
 
 ```{r}
 fav_genre_of_users <- function(random_user_idx, MovieLenseData, Movie_Genre, top_rating=4){
@@ -761,19 +718,19 @@ all_top_n_genres_melted
 
 
 ```{r}
-all_top_n_genres_melted_u21 <- all_top_n_genres_melted %>%
-    filter(user==21)
-ggplot(all_top_n_genres_melted_u21, aes(x = variable, y = value, fill = genre)) +
- geom_col() + labs(title = "Genre distribution of User 21")
+all_top_n_genres_melted_u216 <- all_top_n_genres_melted %>%
+    filter(user==216)
+ggplot(all_top_n_genres_melted_u216, aes(x = variable, y = value, fill = genre)) +
+ geom_col() + labs(title = "Genre distribution of Top@N list of User 216") 
  #scale_y_continuous(labels = percentage)
 ```
 
 
 ```{r}
-all_top_n_genres_melted_u524 <- all_top_n_genres_melted %>%
-    filter(user==524)
-ggplot(all_top_n_genres_melted_u524, aes(x = variable, y = value, fill = genre)) +
- geom_col() + labs(title = "Genre distribution of User 524")
+all_top_n_genres_melted_u514 <- all_top_n_genres_melted %>%
+    filter(user==514)
+ggplot(all_top_n_genres_melted_u514, aes(x = variable, y = value, fill = genre)) +
+ geom_col() + labs(title = "Genre distribution of Top@N list of User 514")
  #scale_y_continuous(labels = percentage)
 ```
 
@@ -820,10 +777,10 @@ Wir nehmen also den absoluten Fehler der prozentualen Verteilung pro genre pro u
 
 ```{r}
 ggplot(melt(genre_error), aes(x = variable, y = value, fill = variable)) +
- geom_col() + labs(title = "Mean absolute error of TopN genre distribution of different Models")
+ geom_col() + labs(title = "Mean absolute error of Top@N genre distribution of different Models")
  #scale_y_continuous(labels = percentage)
 ```
-Hier sehen wir auch, dass SVD sehr gut abschneidet. Wie auch bei Recall und Precision
+Hier sehen wir auch, dass SVD sehr gut abschneidet. Wie auch bei Recall und Precision # AUSSCHREIBEN.
 ```{r}
 
 ```
