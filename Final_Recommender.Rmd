@@ -4,11 +4,9 @@ output: html_notebook
 ---
 ```{r}
 
-install.packages("vegan")
-install.packages("coop")
-install.packages("bench")
+#install.packages(c("vegan", 'coop', 'bench'))
 
-
+library("reshape2")
 library("recommenderlab")
 library("dplyr")
 library("tidyr")
@@ -16,6 +14,7 @@ library("ggplot2")
 library("vegan")
 library("coop")
 library("bench")
+library("gridExtra")
 data("MovieLense")
 ### use only users with more than 100 ratings
 MovieLense100 <- MovieLense[rowCounts(MovieLense) >100,]
@@ -288,7 +287,6 @@ ggplot(mapping=aes(spars_name, all_spars)) +
 
 ```{r}
 
-
 plot_rating_mean <- function(data, plot_title){
   # Extracts rating means by grouping values
   rating_mean <- data %>%
@@ -312,7 +310,6 @@ plot_rating_mean <- function(data, plot_title){
 p1 <- plot_rating_mean(data = as(MovieLense, class(data.frame())), plot_title = "ALL")
 p2 <- plot_rating_mean(data = MovieLense_user_movies_reduced_df, plot_title = "Reduced")
 p3 <- plot_rating_mean(data = Movies_random_selected_df, plot_title = "Random")
-
 
 grid.arrange(p1, p2, p3, ncol=1, nrow=3, top = "Unnormalized Mean Ratings")
 
@@ -505,6 +502,7 @@ Recommender_model_IBCF_cosine_top15_pred <- data.frame(user = sort(rep(1:length(
                                                                        Recommender_model_IBCF_cosine_top15@n)),
                                                        rating = unlist(Recommender_model_IBCF_cosine_top15@ratings),
                                                        index = unlist(Recommender_model_IBCF_cosine_top15@items))
+
 Recommender_model_UBCF_cosine_top15_pred <- data.frame(user = sort(rep(1:length(Recommender_model_UBCF_cosine_top15@items),
                                                                        Recommender_model_UBCF_cosine_top15@n)),
                                                        rating = unlist(Recommender_model_UBCF_cosine_top15@ratings),
@@ -515,6 +513,8 @@ Recommender_model_IBCF_jaccard_top15_pred <- data.frame(user = sort(rep(1:length
                                                                        Recommender_model_IBCF_jaccard_top15@n)),
                                                        rating = unlist(Recommender_model_IBCF_jaccard_top15@ratings),
                                                        index = unlist(Recommender_model_IBCF_jaccard_top15@items))
+
+
 Recommender_model_UBCF_jaccard_top15_pred <- data.frame(user = sort(rep(1:length(Recommender_model_UBCF_jaccard_top15@items),
                                                                        Recommender_model_UBCF_jaccard_top15@n)),
                                                        rating = unlist(Recommender_model_UBCF_jaccard_top15@ratings),
