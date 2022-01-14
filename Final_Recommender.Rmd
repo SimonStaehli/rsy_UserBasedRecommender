@@ -192,6 +192,7 @@ MovieLenseMeta_df <- as(MovieLenseMeta, "data.frame")
 
 MOVIE_MIN_RATED = 700
 USER_MIN_RATED = 400
+SEED = 42
 ####
 
 # Calculate reduced Dataset.
@@ -349,6 +350,12 @@ eval_random_norm <- recommenderlab::evaluationScheme(data = MovieLense_random_no
 eval_reduced <- recommenderlab::evaluationScheme(data = as(MovieLense_user_movies_reduced_df, class(MovieLense)), 
                                                  method="split", train=0.8, given=3)
 
+eval_explicit <- recommenderlab::evaluationScheme(data = Movies_reduced, 
+                                                 method="cross-validation" , train=80, 
+                                                 k=10, given=given_ratings_in_cv, 
+                                                 goodRating=goodRating_threshold)
+
+
 eval_reduced_norm <- recommenderlab::evaluationScheme(data = MovieLense_reduced_norm, 
                                                 method="split", train=0.8, given=3)
 
@@ -491,11 +498,17 @@ Recommender_model_UBCF_jaccard <- Recommender(data = getData(eval_reduced, "trai
 ```{r}
 NUM_RECOMMENDATIONS <- 15
 
-Recommender_model_IBCF_cosine_top15 <-  predict(Recommender_model_IBCF_cosine, newdata=getData(eval_reduced, "unknown"), n=NUM_RECOMMENDATIONS)
-Recommender_model_UBCF_cosine_top15 <-  predict(Recommender_model_UBCF_cosine, newdata=getData(eval_reduced, "unknown"), n=NUM_RECOMMENDATIONS)
-Recommender_model_IBCF_jaccard_top15 <-  predict(Recommender_model_IBCF_jaccard, newdata=getData(eval_reduced, "unknown"), n=NUM_RECOMMENDATIONS)
-Recommender_model_UBCF_jaccard_top15 <-  predict(Recommender_model_UBCF_jaccard, newdata=getData(eval_reduced, "unknown"), n=NUM_RECOMMENDATIONS)
+Recommender_model_IBCF_cosine_top15 <-  predict(Recommender_model_IBCF_cosine, newdata=getData(eval_explicit, "unknown"), n=NUM_RECOMMENDATIONS)
+Recommender_model_UBCF_cosine_top15 <-  predict(Recommender_model_UBCF_cosine, newdata=getData(eval_explicit, "unknown"), n=NUM_RECOMMENDATIONS)
+Recommender_model_IBCF_jaccard_top15 <-  predict(Recommender_model_IBCF_jaccard, newdata=getData(eval_explicit, "unknown"), n=NUM_RECOMMENDATIONS)
+Recommender_model_UBCF_jaccard_top15 <-  predict(Recommender_model_UBCF_jaccard, newdata=getData(eval_explicit, "unknown"), n=NUM_RECOMMENDATIONS)
+
+
 ```
+
+
+
+
 
 ```{r}
 Recommender_model_IBCF_cosine_top15_pred <- data.frame(user = sort(rep(1:length(Recommender_model_IBCF_cosine_top15@items),
@@ -1097,6 +1110,8 @@ teste diese.
 Für diese Aufgabe vergleichen wir ein gutes IBCF-Modell und das gefundene SVD5 Modell.
 
 ```{r}
+SEED <- 42
+
 set.seed(SEED)
 eval_reduced <- recommenderlab::evaluationScheme(data = coerce(MovieLense_user_movies_reduced_df, MovieLense), 
                                                  method="split", train=0.8, given=3)
