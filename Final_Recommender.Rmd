@@ -3,7 +3,12 @@ title: "RSY -Mini Challenge 1"
 output:
   html_document:
     df_print: paged
+    toc: true
+    toc_float: true
 ---
+
+# Librarys
+
 ```{r}
 
 #install.packages(c("vegan", 'coop', 'bench'))
@@ -22,6 +27,10 @@ data("MovieLense")
 MovieLense100 <- MovieLense[rowCounts(MovieLense) >100,]
 MovieLense100
 ```
+----------------
+
+# Explorative Datenanalyse
+
 
 ```{r}
 ## Show rating of 5 users of 5 movies:
@@ -63,7 +72,7 @@ ggplot(MoviesRatedPerUser, aes(x=n)) +
   ggtitle("Verteilungen Anzahl Bewertungen pro User. ") 
 ```
 **Beschreibung**
-Wir beobachten, dass nur wenige User über 400 Bewertungen abgeben haben. Bei den meisten Usern sind es nur ein paar duzend und der Durchschnitt liegt etwa bei 100 Bewertungen.
+Wir beobachten, dass nur wenige User über 400 Bewertungen abgegeben haben. Bei den meisten Usern sind es nur ein paar duzend Bewertungen und der Durchschnitt liegt etwa bei 100.
 
 ```{r}
 # 1.b. Anzahl Bewertungen pro Film
@@ -76,7 +85,7 @@ ggplot(MoviesRatedPertitle, aes(x=n)) +
   ggtitle("Verteilungen Anzahl Bewertungen pro Film. ") 
 ```
 **Beschreibung**
-Wir sehen hier eine ähnliche Verteilung; es gibt ca. 100 Filme mit sehr vielen Bewertungen (50+), aber die meisten Filme haben nicht so viele Bewertungen.
+Wir sehen hier eine ähnliche Verteilung: Es gibt ca. 100 Filme mit sehr vielen Bewertungen (50+), aber die meisten Filme haben wenige bis gar keine Bewertungen.
 
 ```{r}
 # 2.Wie verteilen sich die Kundenratings gesamthaft und nach Genres?
@@ -100,7 +109,7 @@ MovieLenseSample_genre_mean <- MovieLenseSample_genre %>%
 MovieLenseSample_genre_mean
 ```
 **Beschreibung**
-Das Muster der Bewertungen von unterschiedlichen Genres ist sehr ähnlich. Die meisten Bewertungen liegen zwischen 3 und 4. Zudem gibt es starke Schwankungen bei der Anzahl der Bewertungen der jeweiligen Genres. Dies macht es schwieriger sie grafisch zu vergleichen.
+Das Muster der Bewertungen von unterschiedlichen Genres ist sehr ähnlich. Die meisten Bewertungen liegen zwischen 3 und 4. Zudem gibt es starke schwankungen bei der Anzahl der Bewertungen der jeweiligen Genres. Dies macht es schwieriger sie grafisch zu vergleichen.
 
 
 ```{r}
@@ -118,7 +127,7 @@ ggplot(rating_mean, aes(x=mean)) +
             color="blue", linetype="dashed", size=1) +
   xlab("Rating") + ylab("Anzahl")
 ```
-Wir sehen anhand der Grafik zwei Auffälligkeiten: einen starken Peak bei der Bewertung 1 und 5. Unsere Vermutung ist es, dass das Users sind die nur eine Bewertung abgegeben haben.
+Wir sehen anhand der Grafik zwei Auffälligkeiten: Einen starken Peak bei der Bewertung 1 und 5. Unsere Vermutung ist es, dass es Users sind die nur eine Bewertung abgegeben haben.
 
 ```{r}
 summary(rating_mean)
@@ -133,37 +142,38 @@ rating_std<- MovieLenseSample %>%
   arrange(desc(std))
 rating_std
 ggplot(rating_std, aes(x=std)) + 
-  geom_histogram() +
+  geom_histogram(binwidth=0.1) +
   ggtitle("Streuung der Ratings von inviduellen Kunden") + 
   geom_vline(aes(xintercept=mean(std)),
             color="blue", linetype="dashed", size=1)
 summary(rating_std)
 ```
 **Beschreibung**
-Eine Normalverteilung bei der Streuung des Ratings der individuellen Kunden. Auf der X-Achse sehen wir den Wert der Standardabweichung und auf der Y-Achse die Anzahl von Standardabweichungen, welche in den spezifischen Bin fallen. Somit sehen wir, dass die Streuung von inviduellen Kunden am meisten mit einer Standardabweichung von 1 streuuen.
+Eine Normalverteilung bei der Streuung des Ratings der individuellen Kunden. Auf der X-Achse sehen wir den Wert der Standardabweichung und auf der Y-Achse die Anzahl von Standardabweichungen, welche in den spezifischen Säulen fallen. Somit sehen wir, dass die Streuung von inviduellen Kunden am meisten mit einer Standardabweichung von 1 streuuen.
 
 ```{r}
 summary(rating_std)
 ```
 ```{r}
 # 5.Welchen Einfluss hat die Normierung der Ratings pro Kunde auf deren Verteilung?
-MovieLense
 norm_rating_mean <- recommenderlab::normalize(MovieLense, method='center') 
 norm_rating_mean <- as(norm_rating_mean, 'data.frame') 
 ggplot(norm_rating_mean, aes(x=rating)) + 
-  geom_histogram() +
-  ggtitle("Streuung der normierten Ratings von inviduellen Kunden") + 
+  geom_histogram(binwidth=0.1) +
+  ggtitle("Streuung der normierten Ratings von inviduellen Kunden nach method 'center'") + 
   geom_vline(aes(xintercept=mean(rating)),
             color="blue", linetype="dashed", size=1)
 
 norm_rating_mean <- recommenderlab::normalize(MovieLense, method='Z-score') 
 norm_rating_mean <- as(norm_rating_mean, 'data.frame') 
 ggplot(norm_rating_mean, aes(x=rating)) + 
-  geom_histogram() +
-  ggtitle("Streuung der normierten Ratings von inviduellen Kunden") + 
+  geom_histogram(binwidth=0.1) +
+  ggtitle("Streuung der normierten Ratings von inviduellen Kunden nach method 'Z-score'") + 
   geom_vline(aes(xintercept=mean(rating)),
             color="blue", linetype="dashed", size=1)
 ```
+Auch hier sehen wir wieder die Streuung der Ratings von den individuellen Kunden, aber diesmal wurden zwei verschiedene Normierungen durchgeführt. Durch die Normalisierung versucht man die Verzerrung der einzelnen Ratings zu verringern. Die Daten werden zeilenweise zentriert. Das heisst, dass von jedem Rating der Mittelwert der Ratings des jeweilig betreffenden Users abgezogen wird. Der Z-Score wird zusätzlich durch die Standardabweichung der Zeile/Reihe dividiert. (Hahsler 2013, p.17, http://www2.uaem.mx/r-mirror/web/packages/recommenderlab/recommenderlab.pdf)
+
 ```{r}
 MovieLense
 norm_rating_mean <- recommenderlab::normalize(MovieLense) 
@@ -180,7 +190,7 @@ image(MovieLense)
 
 **Beschreibung**
 Man sieht klare Muster: z.B. gibt es Filme, welche sehr selten gerated wurden (vertikale, weisse Linie) und User, welche sehr selten raten (horizontale, weisse Linie).
-Zusätzlich gibt es "oben rechts" sehr viel "nichts". Es scheint aber so, als entsteht dies durch die Funktion "image" von recommenderlab. Leider gibt es wenig Doku da drüber um zu erfahren, warum das entsteht. Es scheint einfach nach etwas bestimmten sortiert zu sein.
+Zusätzlich gibt es "oben rechts" sehr viel "nichts". Es scheint aber so, als entsteht dies durch die Funktion "image" von recommenderlab. Leider gibt es nicht genügend Dokumentationen um mehr drüber zu erfahren, warum das entsteht. Es scheint einfach nach etwas bestimmten sortiert zu sein.
 
 ----------------
 
@@ -293,6 +303,8 @@ ggplot(mapping=aes(spars_name, all_spars)) +
 ```
 **Beschreibung:**
 
+In der Grafik sehen wir hier die unterschiedlichen Matrizen (Datensätze) die wir miteinander vergleichen werden. Die Sparsity von der zufällig reduzierten Matrix (Random Matrix) ist ähnlich wie der von der ganzen Matrix (Full Matrix). Diese Beobachtung macht auch Sinn, da die Auswahl der Datenpunkte zufällig gewählt worden ist. Hingegen bei der reduzierten Matrix (Reduced Matrix) wo wir darauf geachtet haben, dass wir User und Filme mit wenig Ratings entfernen, ist die Sparsity deutlich tiefer.
+
 
 
 ```{r}
@@ -333,6 +345,8 @@ grid.arrange(p1, p2, p3, ncol=1, nrow=3, top="Normalized Mean Ratings")
 
 ```
 **Beschreibung:**
+
+Wenn wir die Kundenratings pro Film vor und nach Datenreduktion betrachten, können wir sehen, dass bei der reduzierten Matrix wo Users mehr Ratings abgegeben haben, eher besser bewerten. Eine Ursache dafür können wir auch direkt aus der Grafik lesen: Fast alle User, die einen Durchschnittsrating von 1 haben fallen weg.
 
 ----------------
 
@@ -436,6 +450,9 @@ p5
 p6
 ```
 **Beschreibung:**
+
+Wenn wir die Vereitlung der Cosine-Ähnlichkeiten der verschiedenen Datensätze betrachten, sticht uns der extreme Spike bei 1 in jedem Histogramm ins Auge. Dies ist zurückzuführen, dass das die diagonalen Werte der Matrizen sind. Bei dem reduzierten Datensatz können wir die Verteilung der Filme bei einer Cosine-Ähnlichkeit um 0.6 herum entdecken.
+
 
 ----------------
 
@@ -571,7 +588,7 @@ ggplot(mapping = aes(x=similarity_cosine)) +
   ggtitle(paste("Prozentuale Top@N Übereinstimmungen für IBCF vs UBCF mit Cosine Similarity"))+
   xlab("Übereinstimmung")
 ```
-In der Grafik sehen wir die Verteilung der Übereinstimmungen für IBCF vs UBCF mit ordinalem Rating und Cosine Similarity für alle Testkunden. Wir können feststellen, dass bei den meisten Usern keine bis ganz wenig eine Übereinstimmung haben. Bei einem User haben wir eine Übereinstimmung von 40%, was sehr hoch ist. Dies bedeutet das von 15 Filmen davon 6 in beiden Listen vorkommt.
+In der Grafik sehen wir die Verteilung der Übereinstimmungen für IBCF vs UBCF mit ordinalem Rating und Cosine Similarity für alle Testkunden. Wir können feststellen, dass bei den meisten Usern keine bis ganz wenige Übereinstimmungen haben. Bei einem User haben wir eine Übereinstimmung von 40%, was sehr hoch ist. Dies bedeutet das von 15 Filmen davon 6 in beiden Listen vorkommt.
 
 
 ```{r}
@@ -616,7 +633,7 @@ ggplot(mapping = aes(x=similarity_UBCF)) +
   ggtitle(paste("Prozentuale Top@N Übereinstimmungen UBCF mit Cosine Similarity und Jaccard Similarity")) +
   xlab("Übereinstimmung")
 ```
-In dieser Grafik vergleichen wir jetzt die Übereinstimmungen für UBCF mit ordinalem (Cosine Similarity) vs binärem Rating (Jaccard Similarity) für alle Testkunden. Hier können wir sagen, dass wir generell die viele Übereinstimmungen haben. Nur 6 User haben gar keine Übereinstimmung.
+In dieser Grafik vergleichen wir jetzt die Übereinstimmungen für UBCF mit ordinalem (Cosine Similarity) vs binärem Rating (Jaccard Similarity) für alle Testkunden. Hier können wir sagen, dass wir generellviele Übereinstimmungen haben. Nur 4 User haben gar keine Übereinstimmung.
 
 
 
@@ -626,9 +643,7 @@ barplot(means, main="Vergleich der einzelnen Similaritys",names.arg=c("similarit
 
    ylab="Mean")
 ```
-Ein kurzer Vergleich der verschiedenen Similaritys die wir in diese Aufgabe angeschaut haben.
-
-
+Ein kurzer Vergleich der verschiedenen Similaritys die wir in dieser Aufgabe angeschaut haben.
 
 
 ----------------
@@ -724,7 +739,6 @@ similarity_SVD_50_mean = mean(similarity_SVD_50)
 
 means = c(similarity_SVD_10_mean,similarity_SVD_20_mean,similarity_SVD_30_mean,similarity_SVD_40_mean,similarity_SVD_50_mean)
 svds = c(10,20,30,40,50)
-
 ```
 
 
@@ -736,7 +750,7 @@ plot(b,
      ylab="Durchschnitt der Übereinstimmung",)
 
 ```
-In dieser Grafik überprüfen wir, wie sich der Anteil übereinstimmender Empfehlungen der Top-15 Liste für IBCF zu verschiedene SVD Modelle verändert, wenn wir die Anzahl der Singulärwerte für SVD verändern. Die Übereinstimmung variiert von ca. 9% bis 10%. keine allzu starke Schwankung. Dadurch können wir sagen, dass die Änderung der Singulärwerte von SVD keinen grossen Einfluss auf die Übereinstimmung haben
+In dieser Grafik überprüfen wir, wie sich der Anteil übereinstimmender Empfehlungen der Top-15 Liste für IBCF zu verschiedene SVD Modelle verändert, wenn wir die Anzahl der Singulärwerte für SVD verändern. Die Übereinstimmung variiert sehr schwach. Dadurch können wir sagen, dass die Änderung der Singulärwerte von SVD keinen grossen Einfluss auf die Übereinstimmung haben
 
 
 
