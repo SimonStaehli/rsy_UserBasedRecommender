@@ -1,6 +1,8 @@
 ---
 title: "RSY -Mini Challenge 1"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 ```{r}
 
@@ -347,6 +349,14 @@ Datensatz.
 4. Bestimme die Filme, die am häufigsten in der Cosine-Ähnlichkeitsmatrix auftauchen und analysiere deren Vorkommen und Ratings im reduzierten Datensatz.
 
 ```{r}
+# Konvertieren in RealRatingmatrizen
+Movies_reduced <- coerce(MovieLense_user_movies_reduced_df, MovieLense)
+Movies_random <- coerce(Movies_random_selected_df, MovieLense)
+Movies_top_movies <- coerce(MoviesLense_random_user_top_movies_df, MovieLense)
+
+given_ratings_in_cv <- 10
+goodRating_threshold <- 3
+
 
 eval_random <- recommenderlab::evaluationScheme(data = as(Movies_random_selected_df, class(MovieLense)), 
                                                  method="split", train=0.8, given=3)
