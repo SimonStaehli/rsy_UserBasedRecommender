@@ -1,0 +1,111 @@
+---
+title: "RSY -Mini Challenge 1"
+output: html_notebook
+---
+```{r}
+library("recommenderlab")
+library("dplyr")
+library("tidyr")
+library("ggplot2")
+data("MovieLense")
+### use only users with more than 100 ratings
+MovieLense100 <- MovieLense[rowCounts(MovieLense) >100,]
+MovieLense100
+```
+
+```{r}
+## Show rating of 50 users of 10 movies:
+ml10 <- MovieLense[c(1:50),c(1:10)]
+as(ml10, "matrix")
+```
+```{r}
+# Create subsample for Group Work:
+MovieLenseSample <- sample(x=MovieLense, size=500)
+MovieLenseSample <- as(MovieLenseSample, 'data.frame') 
+MovieLenseSample <- MovieLenseSample %>% rename(title = item )
+MovieLenseSample
+```
+```{r}
+# 1.Welches sind die am häufigsten geschauten Genres/Filme?
+MostWatchedMovies <- MovieLenseSample %>% count(title, sort=TRUE)
+MostWatchedMovies
+
+Movie_Genre <- MovieLenseMeta %>%
+  pivot_longer(cols=c(unknown:Western)) %>%
+  filter(value==1) %>% 
+  rename(genre = name)
+
+MostWatchedGenres <- inner_join(MostWatchedMovies, Movie_Genre) %>%
+  count(genre, sort=TRUE)
+MostWatchedGenres
+```
+```{r}
+# 2.Wie verteilen sich die Kundenratings gesamthaft und nach Genres?
+ggplot(MovieLenseSample, aes(x=rating)) + 
+  geom_bar() +
+  ggtitle(paste("Kundenratings gesamthaft. Durchschnitt: ", round(mean(MovieLenseSample$rating),2)))
+
+# grouped boxplot
+MovieLenseSample_genre <- inner_join(MovieLenseSample, Movie_Genre)
+ggplot(MovieLenseSample_genre, aes(x=rating, fill=genre)) + 
+  geom_bar(mapping = aes(x = rating)) + 
+  facet_wrap(~ genre)
+
+MovieLenseSample_genre_mean <- MovieLenseSample_genre %>%
+  group_by(genre) %>%
+  summarise(mean = mean(rating)) %>%
+  select(genre, mean) %>%
+  arrange(desc(mean))
+
+
+MovieLenseSample_genre_mean
+```
+```{r}
+# 3.Wie verteilen sich die mittleren Kundenratings pro Film?
+rating_mean <- MovieLenseSample %>%
+  group_by(title) %>%
+  summarise(mean = mean(rating)) %>%
+  select(title, mean) %>%
+  arrange(desc(mean))
+rating_mean
+ggplot(rating_mean, aes(x=mean)) + 
+  geom_density() +   
+  ggtitle("Verteilung der mittleren Kundenratings") + 
+  geom_vline(aes(xintercept=mean(mean)),
+            color="blue", linetype="dashed", size=1)
+```
+```{r}
+# 4.Wie stark streuen die Ratings von individuellen Kunden?
+rating_std<- MovieLenseSample %>%
+  group_by(user) %>%
+  summarise(std = sd(rating)) %>%
+  select(user, std) %>%
+  arrange(desc(std))
+rating_std
+ggplot(rating_std, aes(x=std)) + 
+  geom_density() +
+  ggtitle("Streuung der Ratings von inviduellen Kunden") + 
+  geom_vline(aes(xintercept=mean(std)),
+            color="blue", linetype="dashed", size=1)
+```
+```{r}
+# 5.Welchen Einfluss hat die Normierung der Ratings pro Kunde auf deren Verteilung?
+scale_this <- function(x){
+  (x - mean(x, na.rm=TRUE)) / sd(x, na.rm=TRUE)
+}
+norm_rating_mean <- MovieLenseSample %>%
+  group_by(user) %>%
+  mutate(rating_norm = scale_this(rating)) %>%
+  select(user, rating, rating_norm)
+
+ggplot(norm_rating_mean, aes(x=rating_norm)) + 
+  geom_density() +
+  ggtitle("Streuung der normierten Ratings von inviduellen Kunden") + 
+  geom_vline(aes(xintercept=mean(rating_norm)),
+            color="blue", linetype="dashed", size=1)
+```
+```{r}
+# 6.Welche strukturellen Charakteristika (z.B. Sparsity) und Auffälligkeiten zeigt die User-Item Matrix?
+image(MovieLense)
+```
+Gewisse 
